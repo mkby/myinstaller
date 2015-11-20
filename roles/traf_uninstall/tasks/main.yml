@@ -1,0 +1,18 @@
+---
+- name: Stop trafodion processes if exist
+  shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
+  sudo: yes
+  sudo_user: trafodion
+  ignore_errors: true
+
+- name: Uninstall trafodion RPM
+  yum: name=trafodion state=absent
+  sudo: yes
+
+- name: Remove trafodion home directory
+  shell: "rm /home/trafodion -rf"
+  sudo: yes
+
+- name: Delete trafodion user
+  user: name=trafodion state=absent remove=yes
+  sudo: yes

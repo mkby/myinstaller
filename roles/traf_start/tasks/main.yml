@@ -1,0 +1,22 @@
+- name: create sqconfig for trafodion instance
+  script:  traf_sqconfig {{ansible_processor_vcpus - 1}} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
+  sudo: yes
+  sudo_user: trafodion
+
+- name: run sqgen for trafodion instance
+  shell: 'source /home/trafodion/.bashrc; sqgen'
+  sudo: yes
+  sudo_user: trafodion
+
+- name: start trafodion instance
+  shell: 'source /home/trafodion/.bashrc; sqstart'
+  sudo: yes
+  sudo_user: trafodion
+  when: traf_start=='y'
+
+- name: initialize trafodion
+  shell: 'source /home/trafodion/.bashrc; echo \"initialize Trafodion;\" | sqlci'
+  sudo: yes
+  sudo_user: trafodion
+  when: traf_init=='y'
+

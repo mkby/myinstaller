@@ -1,0 +1,13 @@
+#!/bin/bash
+
+core=$1
+proc=$2
+sqconfig=$3
+shift 3
+node_id=0
+echo "begin node" > $sqconfig
+for node in $@; do
+    echo "node-id=$node_id;node-name=$node;cores=0-$core;processors=$proc;roles=connection,aggregation,storage" >> $sqconfig
+    ((node_id++))
+done
+echo "end node" >> $sqconfig

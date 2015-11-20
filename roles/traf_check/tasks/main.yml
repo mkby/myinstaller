@@ -1,0 +1,23 @@
+- name: Check nodes connectivity
+  ping: 
+
+- name: Check sudo access
+  command: "echo"
+  sudo: yes
+
+#- name: Check HBase version
+
+- name: Check JDK version
+  shell: "{{ java_home }}/bin/javac -version 2>&1|grep -o '[0-9]\\.[0-9]'"
+  register: javac_ver
+  failed_when: javac_ver.stdout!='1.7' and javac_ver.stdout!='1.8'
+
+#- name: Check System FQDN setting
+#  shell: " [ $(hostname -f) == $(hostname -s) ]"
+#  register: h
+#  failed_when: h.rc==0
+
+- name: Check Hardware Platform should be x86_64
+  command: "uname -i"
+  register: hw
+  failed_when: hw.stdout!='x86_64'

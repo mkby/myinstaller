@@ -1,0 +1,23 @@
+# restart Hadoop services
+- name: Restarting Hadoop
+  uri: url=http://{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/commands/restart
+       method=POST
+       user={{ mgr_user }}
+       password={{ mgr_pwd }}
+  register: restart_cmd
+  tags: restart_hadoop
+
+- name: "Check restart status until successful (timeout: 10mins)"
+  uri: url=http://{{ mgr_url }}/api/v1/commands/{{ restart_cmd.json.id }}
+       method=GET
+       user={{ mgr_user }}
+       password={{ mgr_pwd }}
+  register: restart_status
+  until: restart_status.json.active==False and restart_status.json.success==True
+  retries: 30
+  delay: 20
+
+- name: Wait to make sure HDFS is fully restarted and out of safemode
+  shell: "hdfs dfsadmin -safemode wait"
+  sudo_user: hdfs
+  sudo: yes

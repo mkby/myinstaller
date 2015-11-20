@@ -1,0 +1,5 @@
+---
+- hosts: 
+  - trafnodes
+  roles:
+  - traf_uninstall

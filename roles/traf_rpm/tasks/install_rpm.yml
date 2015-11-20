@@ -1,0 +1,57 @@
+- name: Install epel repo if not exists
+  copy: src=epel.repo dest=/etc/yum.repos.d/ force=no
+  sudo: yes
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Install httplib2 python module for further usage
+  yum: name=python-httplib2 state=present disable_gpg_check=yes
+  sudo: yes
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Install httplib2 python module for further usage on SuSE
+  zypper: name=python-httplib2 state=present disable_gpg_check=yes
+  sudo: yes
+  when: ansible_os_family == 'SuSE'
+
+- name: Copy trafodion RPM to all nodes
+  copy: src={{ traf_rpm }} dest=/tmp/ force=no
+
+- name: Get RPM full name
+  shell: "echo {{ traf_rpm }} | awk -F/ '{print $NF}'"
+  register: fullname
+
+- set_fact:
+      rpm_name: "{{ fullname.stdout }}"
+    
+- name: Install trafodion RPM
+  yum: name="/tmp/{{ rpm_name }}" state=present
+  sudo: yes
+  register: rpm_installed
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Install trafodion RPM
+  zypper: name="/tmp/{{ rpm_name }}" state=present
+  sudo: yes
+  register: rpm_installed
+  when: ansible_os_family == 'SuSE'
+
+- name: Create trafodion user if not exists
+  user: name=trafodion shell=/bin/bash groups=trafodion
+  sudo: yes
+
+- name: Post config modify owner of trafodion directory
+  file: path=/home/trafodion/ state=directory recurse=yes owner=trafodion group=trafodion
+  sudo: yes
+
+- shell: "rpm -ql {{ rpm_basename }} |head -1"
+  register: traf_loc
+    
+- shell: "echo {{ traf_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
+  register: traf_version
+  when: traf_loc|success
+
+- set_fact:
+    sq_root: "{{ traf_loc.stdout }}"
+    traf_ver: "{{ traf_version.stdout }}"
+  when: traf_version|success
+

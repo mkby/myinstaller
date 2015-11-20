@@ -1,0 +1,3 @@
+- name: template
+  #- include: bashrc_default
+  - include: test_tmpl.j2

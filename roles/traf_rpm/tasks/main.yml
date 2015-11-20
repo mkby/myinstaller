@@ -1,0 +1,2 @@
+- name: call install-rpm
+  include: install_rpm.yml

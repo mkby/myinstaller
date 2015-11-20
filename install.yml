@@ -1,0 +1,17 @@
+---
+- hosts: 
+  - trafnodes
+  remote_user: root
+  roles:
+  - traf_check
+  - traf_rpm
+  - traf_setup
+
+
+- hosts:
+  - firstnode
+  remote_user: root
+  roles:
+  - hadoop_mods
+  - traf_start
+

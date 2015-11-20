@@ -1,0 +1,2 @@
+NoHostAuthenticationForLocalhost=yes
+StrictHostKeyChecking=no

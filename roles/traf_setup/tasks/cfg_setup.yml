@@ -1,0 +1,66 @@
+# TODO: add ldap security config
+- name: Disable iptables
+  service: name=iptables state=stopped
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Set max Kernel pid
+  shell: "sysctl -w kernel.pid_max=65535 2>&1 > /dev/null"
+  sudo_user: root
+  sudo: yes
+
+# set as default
+- set_fact:
+    hbase_lib_path: "/usr/lib/hbase/lib"
+
+# cannot find parcel install dir config from cdh rest api
+# use the default parcel dir
+- name: Detect HBase lib path for cdh parcel
+  stat: path=/opt/cloudera/parcels/CDH/lib/hbase/lib
+  register: parcel
+
+- set_fact:
+    hbase_lib_path: "/opt/cloudera/parcels/CDH/lib/hbase/lib"
+  when: parcel.stat.exists==True
+
+
+- name: Copy HBase trx jar file to all nodes
+  shell: "cp /home/trafodion/trafodion-{{ traf_ver }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }}"
+  sudo_user: root
+  sudo: yes
+
+- name: Get network interface
+  shell: "netstat -rn | grep '^0.0.0.0' | awk '{print $8}'"
+  register: net_interface
+
+- name: Get zookeeper quorum
+  shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
+  register: zookeeper_quorum
+
+- set_fact:
+    interface: "{{ net_interface.stdout }}"
+    zk_hosts: "{{ zookeeper_quorum.stdout }}"
+    dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
+    rest_site_file: "{{ sq_root }}/rest-{{ traf_ver }}/conf/rest-site.xml"
+    dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
+
+- name: Generate dcs-site.xml
+  template: src=dcs-site.xml.j2 dest={{ dcs_site_file }}
+  sudo: yes
+
+- name: Generate rest-site.xml
+  template: src=rest-site.xml.j2 dest={{ rest_site_file }}
+  sudo: yes
+
+- name: Generate servers file
+  script: gen_dcsserver.py {{ dcs_srv_file }} {{ dcs_count }} {{ node_list }}
+  sudo: yes
+
+- name: Set dcs install path in sqenvcom.sh
+  lineinfile: dest={{ sq_root }}/sqenvcom.sh
+              line="export DCS_INSTALL_DIR={{ sq_root }}/dcs-{{ traf_ver }}"
+  sudo: yes
+
+- name: Set rest install path in sqenvcom.sh
+  lineinfile: dest={{ sq_root }}/sqenvcom.sh
+              line="export REST_INSTALL_DIR={{ sq_root }}/rest-{{ traf_ver }}"
+  sudo: yes

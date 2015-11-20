@@ -1,0 +1,6 @@
+#!/bin/bash
+
+hdfs dfs -setfacl -R -m user:trafodion:rwx /hbase/archive
+hdfs dfs -setfacl -R -m default:user:trafodion:rwx /hbase/archive
+hdfs dfs -setfacl -R -m mask::rwx /hbase/archive
+
