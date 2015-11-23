@@ -10,7 +10,7 @@
 - name: Check JDK version
   shell: "{{ java_home }}/bin/javac -version 2>&1|grep -o '[0-9]\\.[0-9]'"
   register: javac_ver
-  failed_when: javac_ver.stdout!='1.7' and javac_ver.stdout!='1.8'
+  failed_when: javac_ver.stdout!='1.7'
 
 #- name: Check System FQDN setting
 #  shell: " [ $(hostname -f) == $(hostname -s) ]"
@@ -21,3 +21,30 @@
   command: "uname -i"
   register: hw
   failed_when: hw.stdout!='x86_64'
+
+- name: Check if Trafodion is previously installed
+  shell: "rpm -qa|grep -c {{ rpm_basename }}"
+  register: trafinstalled
+
+- name: Check if Trafodion is running
+  shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'|echo -n"
+  register: trafstat
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
+  sudo_user: trafodion
+  sudo: yes
+
+- debug: var=trafstat.stdout
+
+- name: Stop Trafodion if it's running
+  shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
+  sudo_user: trafodion
+  sudo: yes
+
+- set_fact:
+    traf_init: "y"
+
+- set_fact:
+    traf_init: "n"
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
+  

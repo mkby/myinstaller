@@ -1,0 +1,6 @@
+## Trafodion Floating IP commands
+Cmnd_Alias IP = /sbin/ip
+Cmnd_Alias ARP = /sbin/arping
+ 
+## Allow Trafodion id to run commands needed to configure floating IP
+%trafodion ALL = NOPASSWD: IP,ARP

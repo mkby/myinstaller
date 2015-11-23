@@ -1,7 +1,11 @@
 ---
 - hosts: 
+  - localhost
+  roles:
+  - traf_vars
+
+- hosts: 
   - trafnodes
-  remote_user: root
   roles:
   - traf_check
   - traf_rpm
@@ -10,8 +14,11 @@
 
 - hosts:
   - firstnode
-  remote_user: root
   roles:
   - hadoop_mods
   - traf_start
 
+- hosts: 
+  - trafnodes
+  roles:
+  - { role: traf_ha when: traf_enable_ha=='y' }

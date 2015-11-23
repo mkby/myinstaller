@@ -3,18 +3,18 @@
   sudo: yes
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
-- name: Install httplib2 python module for further usage
+- name: Install httplib2 on CentOS/RedHat
   yum: name=python-httplib2 state=present disable_gpg_check=yes
   sudo: yes
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
-- name: Install httplib2 python module for further usage on SuSE
+- name: Install httplib2 on SuSE
   zypper: name=python-httplib2 state=present disable_gpg_check=yes
   sudo: yes
   when: ansible_os_family == 'SuSE'
 
 - name: Copy trafodion RPM to all nodes
-  copy: src={{ traf_rpm }} dest=/tmp/ force=no
+  copy: src={{ traf_rpm }} dest=/tmp/ force=yes
 
 - name: Get RPM full name
   shell: "echo {{ traf_rpm }} | awk -F/ '{print $NF}'"
@@ -22,6 +22,7 @@
 
 - set_fact:
       rpm_name: "{{ fullname.stdout }}"
+
     
 - name: Install trafodion RPM
   yum: name="/tmp/{{ rpm_name }}" state=present
@@ -35,6 +36,11 @@
   register: rpm_installed
   when: ansible_os_family == 'SuSE'
 
+- name: Reinstall trafodion RPM if already installed
+  shell: "rpm -i /tmp/{{ rpm_name }} --force"
+  when: rpm_installed.changed==False
+  sudo: yes
+
 - name: Create trafodion user if not exists
   user: name=trafodion shell=/bin/bash groups=trafodion
   sudo: yes
@@ -43,10 +49,12 @@
   file: path=/home/trafodion/ state=directory recurse=yes owner=trafodion group=trafodion
   sudo: yes
 
-- shell: "rpm -ql {{ rpm_basename }} |head -1"
+- name: Get RPM location
+  shell: "rpm -ql {{ rpm_basename }} |head -1"
   register: traf_loc
     
-- shell: "echo {{ traf_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
+- name: Get RPM version
+  shell: "echo {{ traf_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
   register: traf_version
   when: traf_loc|success
 

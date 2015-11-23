@@ -1,4 +1,34 @@
 ---
+# set default value if not provided by user input
+- set_fact:
+    traf_start: "y"
+    when: traf_start==''
+- set_fact:
+    traf_pwd: "traf123"
+    when: traf_pwd==''
+- set_fact:
+    hdfs_user: "hdfs"
+    when: hdfs_user==''
+- set_fact:
+    hbase_user: "hbase"
+    when: hbase_user==''
+- set_fact:
+    hbase_group: "hbase"
+    when: hbase_group==''
+- set_fact:
+    ldap_security: "n"
+    when: ldap_security==''
+- set_fact:
+    dcs_ha: "n"
+    when: dcs_ha==''
+- set_fact:
+    mgr_user: "admin"
+    when: mgr_user==''
+- set_fact:
+    mgr_pwd: "admin"
+    when: mgr_pwd==''
+
+
 - name: Check Manager URL
   uri: url=http://{{ mgr_url }}/api/v1/clusters/
        method=GET
@@ -65,35 +95,11 @@
     node_list: "{{ ' ' + node_array|join(' ') }}"
     first_node: "{{ node_array[0] }}"
     hbase_xml_file: "/etc/hbase/conf/hbase-site.xml"
+    rpm_basename: "trafodion"
     dcs_count: "{{ node_array|length() * dcs_cnt_per_node|int }}"
 
 
-# set default value if not provided by user input
-- set_fact:
-    traf_init: "n"
-    when: traf_init==''
-- set_fact:
-    traf_start: "y"
-    when: traf_start==''
-- set_fact:
-    traf_pwd: "traf123"
-    when: traf_pwd==''
-- set_fact:
-    hdfs_user: "hdfs"
-    when: hdfs_user==''
-- set_fact:
-    hbase_user: "hbase"
-    when: hbase_user==''
-- set_fact:
-    hbase_group: "hbase"
-    when: hbase_group==''
-- set_fact:
-    ldap_security: "n"
-    when: ldap_security==''
     
-#- debug: var=my_nodes
-#- debug: var=node_list
-#- debug: var=dcs_count
 
 - name: Set ansible cfg and hosts file
   script: gen_cfgs.py "{{ installer_loc }}" "\"{{ node_list }}\""  

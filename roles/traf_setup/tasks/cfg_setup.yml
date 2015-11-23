@@ -8,11 +8,10 @@
   sudo_user: root
   sudo: yes
 
-# set as default
+#set as default value
 - set_fact:
     hbase_lib_path: "/usr/lib/hbase/lib"
 
-# cannot find parcel install dir config from cdh rest api
 # use the default parcel dir
 - name: Detect HBase lib path for cdh parcel
   stat: path=/opt/cloudera/parcels/CDH/lib/hbase/lib
@@ -22,12 +21,12 @@
     hbase_lib_path: "/opt/cloudera/parcels/CDH/lib/hbase/lib"
   when: parcel.stat.exists==True
 
-
+# cdh setting, just put it here to run on all nodes
 - name: Copy HBase trx jar file to all nodes
   shell: "cp /home/trafodion/trafodion-{{ traf_ver }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }}"
-  sudo_user: root
   sudo: yes
 
+# dcs
 - name: Get network interface
   shell: "netstat -rn | grep '^0.0.0.0' | awk '{print $8}'"
   register: net_interface
@@ -39,13 +38,36 @@
 - set_fact:
     interface: "{{ net_interface.stdout }}"
     zk_hosts: "{{ zookeeper_quorum.stdout }}"
+    dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
+    bk_master_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
     dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
     rest_site_file: "{{ sq_root }}/rest-{{ traf_ver }}/conf/rest-site.xml"
-    dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
 
 - name: Generate dcs-site.xml
   template: src=dcs-site.xml.j2 dest={{ dcs_site_file }}
   sudo: yes
+  when: dcs_ha!='y'
+
+- name: Generate dcs-site.xml for DCS HA
+  template: src=dcs-site-ha.xml.j2 dest={{ dcs_site_file }}
+  sudo: yes
+  when: dcs_ha=='y'
+
+- name: Generate sudoers config for trafodion user
+  copy: src=trafodion_sudoer_cfg dest=/etc/sudoers.d/
+  sudo: yes
+  when: dcs_ha=='y'
+
+- name: Mod trafci for DCS HA
+  replace: dest={{ sq_root }}/trafci/bin/trafci regexp='localhost' replace={{ floating_ip }}
+  sudo: yes
+  when: dcs_ha=='y'
+
+- name: Mod backup-master file
+  lineinfile: dest=bk_master_file line={{ item }}
+  with_items: dcs_bakcup_hosts
+  sudo: yes
+  when: dcs_ha=='y'
 
 - name: Generate rest-site.xml
   template: src=rest-site.xml.j2 dest={{ rest_site_file }}

@@ -9,10 +9,11 @@
   yum: name=trafodion state=absent
   sudo: yes
 
-- name: Remove trafodion home directory
-  shell: "rm /home/trafodion -rf"
+- name: Remove trafodion RPM and user home directory
+  shell: "rm /home/trafodion /tmp/trafodion*.rpm -rf"
   sudo: yes
 
 - name: Delete trafodion user
   user: name=trafodion state=absent remove=yes
   sudo: yes
+
