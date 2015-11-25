@@ -1,9 +1,14 @@
 ---
+- name: Check trafodion home existence
+  stat: path=/home/trafodion/
+  register: trafuser
+  
 - name: Stop trafodion processes if exist
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
   sudo: yes
   sudo_user: trafodion
   ignore_errors: true
+  when: trafuser.stat.exists==True
 
 - name: Uninstall trafodion RPM
   yum: name=trafodion state=absent

@@ -80,13 +80,14 @@
                     {% if id==h.hostId %} {{ h.hostname }} {% endif %}
                   {% endfor %}
                 {% endfor %}"
+  when: node_list==''
 
 - set_fact:
     node_array: "{{ node_list.split() | sort }}"
 
-- set_fact:
-    dcs_cnt_per_node: 8
-    when: dcs_cnt_per_node==''
+#- set_fact:
+#    dcs_cnt_per_node: 8
+#  when: dcs_cnt_per_node==''
 
 - set_fact:
     # used in URL

@@ -3,6 +3,7 @@
   - localhost
   roles:
   - traf_vars
+  tags: var_tag
 
 - hosts: 
   - trafnodes
@@ -10,6 +11,7 @@
   - traf_check
   - traf_rpm
   - traf_setup
+  tags: install_tag
 
 
 - hosts:
@@ -17,8 +19,5 @@
   roles:
   - hadoop_mods
   - traf_start
+  tags: install_tag
 
-- hosts: 
-  - trafnodes
-  roles:
-  - { role: traf_ha when: traf_enable_ha=='y' }

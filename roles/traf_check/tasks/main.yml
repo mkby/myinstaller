@@ -23,8 +23,10 @@
   failed_when: hw.stdout!='x86_64'
 
 - name: Check if Trafodion is previously installed
-  shell: "rpm -qa|grep -c {{ rpm_basename }}"
+  # force rc=0, don't let it fail
+  shell: "rpm -qa|grep -c {{ rpm_basename }}; echo -n"
   register: trafinstalled
+  sudo: yes
 
 - name: Check if Trafodion is running
   shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'|echo -n"

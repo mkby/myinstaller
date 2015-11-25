@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
-import getpass
 import sys
 import os
 import re
+import json
+import getpass
+from datetime import date
+from subprocess import Popen, PIPE
 
 class UserInput:
     def __init__(self):
@@ -58,7 +61,7 @@ class UserInput:
             'dcs_cnt_per_node':
             {
                 'prompt':'Enter number of DCS client connections per node',
-                'default':8
+                'default':'8'
             },
             'mgr_url':
             {
@@ -126,12 +129,14 @@ class UserInput:
     
         if ispasswd:
             orig = getpass.getpass(prompt)
-            confirm = getpass.getpass('Confirm ' + prompt)
-            if orig == confirm: answer = confirm
-            if not answer and default: 
+            if (not orig) and default: 
                 answer = default
             else:
-                self.log_err('Password mismatch')
+                confirm = getpass.getpass('Confirm ' + prompt)
+                if orig == confirm: 
+                    answer = confirm
+                else:
+                    self.log_err('Password mismatch')
         else:
             answer = raw_input(prompt)
             if not answer and default: answer = default
@@ -181,12 +186,22 @@ def format_output(text):
     print '  ' + text
     print '*' * num
 
-def main():
-    format_output('EsgynDB INSTALLATION START')
+def user_input():
+    """ get user's input """
 
     u = UserInput()
     
+    traf_rpm = u.getinput('traf_rpm')
+
+    mgr_url = u.getinput('mgr_url')
+    if ('http:' or 'https:') in mgr_url: u.log_err('Do not include http or https')
+    mgr_user = u.getinput('mgr_user')
+    mgr_pwd = u.getinput('mgr_pwd')
+
+    java_home = u.getinput('java_home')
+
     use_hbase_node = u.getinput('use_hbase_node')
+    node_list = ''
     if  use_hbase_node == 'N':
         node_list = ' '.join(expNumRe(u.getinput('node_list')))
         print ' === NODE LIST ===\n' + node_list
@@ -195,28 +210,74 @@ def main():
     
     traf_start = u.getinput('traf_start')
     traf_pwd = u.getinput('traf_pwd')
-    traf_rpm = u.getinput('traf_rpm')
 
-    # check format, should not include http
-    mgr_url = u.getinput('mgr_url')
-
-    mgr_user = u.getinput('mgr_user')
-    mgr_pwd = u.getinput('mgr_pwd')
     hdfs_user = u.getinput('hdfs_user')
     hbase_user = u.getinput('hbase_user')
     hbase_group = u.getinput('hbase_group')
-    ldap_security = u.getinput('ldap_security')
-    dcs_ha = u.getinput('dcs_ha')
-    java_home = u.getinput('java_home')
     dcs_cnt_per_node = u.getinput('dcs_cnt_per_node')
+    dcs_ha = u.getinput('dcs_ha')
+    ldap_security = u.getinput('ldap_security')
+
+    cfgs = {
+    'traf_rpm':          traf_rpm,
+    'mgr_url':           mgr_url,
+    'mgr_user':          mgr_user,
+    'mgr_pwd':           mgr_pwd,
+    'java_home':         java_home,
+    'use_hbase_node':    use_hbase_node,
+    'node_list':         node_list,
+    'traf_start':        traf_start,
+    'traf_pwd':          traf_pwd,
+    'hdfs_user':         hdfs_user,
+    'hbase_user':        hbase_user,
+    'hbase_group':       hbase_group,
+    'dcs_cnt_per_node':  dcs_cnt_per_node,
+    'dcs_ha':            dcs_ha,
+    'ldap_security':     ldap_security,
+    }
+    return json.dumps(cfgs)
+
+
+def main():
+    """ esgyndb_installer main loop """
+
+    format_output('EsgynDB INSTALLATION START')
 
     installer_loc = sys.path[0]
+    config_file = installer_loc + '/group_vars/all.yml'
 
-    # detect config file existence
+    # TODO
+    # overwrite config_file with --config-file option
+    # config_file = xxx
 
-    #ansible-playbook gen_vars.yml -e "installer_loc=$installer_loc" -i $installer_loc/default_hosts
-    #ansible-playbook install.yml
-    
+    if not os.path.exists(config_file): 
+        cfgs = user_input()
+        # generate config file first
+        cmd = 'ansible-playbook %s/install.yml -e \'%s\' -e installer_loc=%s -i %s/default_hosts --tags=var_tag' % \
+            (installer_loc, cfgs, installer_loc, installer_loc)
+        rc = os.system(cmd)
+        if rc: sys.exit(rc)
+
+        # start installing using generated config file 'group_vars/all.yml'
+        cmd = 'ansible-playbook %s/install.yml -e installer_loc=%s -i %s/default_hosts --tags=install_tag' % \
+            (installer_loc, installer_loc, installer_loc)
+        rc = os.system(cmd)
+        if rc: sys.exit(rc)
+    else:
+        # start installing using specified config file
+        cmd = 'ansible-playbook %s/install.yml -e @%s -e installer_loc=%s -i %s/default_hosts --tags=install_tag' % \
+            (installer_loc, config_file, installer_loc, installer_loc)
+        rc = os.system(cmd)
+        if rc: sys.exit(rc)
+
+    format_output('EsgynDB INSTALLATION COMPLETE')
+
+    # rename config file when successfully installed
+    ts = date.today().strftime('%Y%m%d_%H%M')
+    try:
+        os.rename(config_file, config_file + '.bak' + ts)
+    except OSError:
+        pass
     
 if __name__ == "__main__":
     try:
