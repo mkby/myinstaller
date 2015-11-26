@@ -35,8 +35,6 @@
   sudo_user: trafodion
   sudo: yes
 
-- debug: var=trafstat.stdout
-
 - name: Stop Trafodion if it's running
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
   when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'

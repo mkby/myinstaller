@@ -12,11 +12,11 @@
   shell: 'source /home/trafodion/.bashrc; sqstart'
   sudo: yes
   sudo_user: trafodion
-  when: traf_start=='y'
+  when: traf_start=='Y'
 
 - name: initialize trafodion
   shell: 'source /home/trafodion/.bashrc; echo \"initialize Trafodion;\" | sqlci'
   sudo: yes
   sudo_user: trafodion
-  when: traf_init=='y'
+  when: traf_init=='Y'
 

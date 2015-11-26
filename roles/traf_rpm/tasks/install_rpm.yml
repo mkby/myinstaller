@@ -3,15 +3,15 @@
   sudo: yes
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
-- name: Install httplib2 on CentOS/RedHat
-  yum: name=python-httplib2 state=present disable_gpg_check=yes
-  sudo: yes
-  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
-
-- name: Install httplib2 on SuSE
-  zypper: name=python-httplib2 state=present disable_gpg_check=yes
-  sudo: yes
-  when: ansible_os_family == 'SuSE'
+#- name: Install httplib2 on CentOS/RedHat
+#  yum: name=python-httplib2 state=present disable_gpg_check=yes
+#  sudo: yes
+#  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+#
+#- name: Install httplib2 on SuSE
+#  zypper: name=python-httplib2 state=present disable_gpg_check=yes
+#  sudo: yes
+#  when: ansible_os_family == 'SuSE'
 
 - name: Copy trafodion RPM to all nodes
   copy: src={{ traf_rpm }} dest=/tmp/ force=yes

@@ -4,9 +4,55 @@ import sys
 import os
 import re
 import json
+import httplib2
 import getpass
-from datetime import date
+import time
 from subprocess import Popen, PIPE
+
+class ParseJson:
+    """ 
+    jload: load json file to a dict
+    jsave: save dict to json file with pretty format
+    """
+    def __init__(self, js_file):
+        self.js_file = js_file
+
+    def jload(self):
+        with open(self.js_file, 'r') as f:
+            tmparray = f.readlines()
+        content = ''
+        for t in tmparray:
+            content += t
+
+        try:
+            return json.loads(content)
+        except ValueError:
+            log_err('No json format found in config file')
+
+    def jsave(self, dic):
+        with open(self.js_file, 'w') as f:
+            f.write(json.dumps(dic, indent=4))
+
+class HttpGet:
+    def __init__(self, user, passwd):
+        self.user = user
+        self.passwd = passwd
+        self.h = httplib2.Http(".cache")  
+        self.h.add_credentials(self.user, self.passwd)
+
+    def get_content(self, url):
+        self.url = url
+        try:
+            resp, content = self.h.request(self.url, "GET")  
+        except:
+            log_err('Failed to access manager URL ' + url)
+
+        try:
+            return json.loads(content)
+        except ValueError:
+            log_err('No json format found in http content')
+            
+
 
 class UserInput:
     def __init__(self):
@@ -106,9 +152,6 @@ class UserInput:
             },
         }
     
-    def log_err(self, errtext):
-        print '***ERROR: ' + errtext
-        sys.exit(1)
     
     def _handle_input(self, args):
         prompt = args['prompt']
@@ -136,7 +179,7 @@ class UserInput:
                 if orig == confirm: 
                     answer = confirm
                 else:
-                    self.log_err('Password mismatch')
+                    log_err('Password mismatch')
         else:
             answer = raw_input(prompt)
             if not answer and default: answer = default
@@ -145,10 +188,10 @@ class UserInput:
         if isYN:
             answer = answer.upper()
             if answer != 'Y' and answer != 'N':
-                self.log_err('Invalid parameter, should be \'Y|y|N|n\'')
+                log_err('Invalid parameter, should be \'Y|y|N|n\'')
         else:
             if not answer:
-                self.log_err('Empty value')
+                log_err('Empty value')
         
         return answer
     
@@ -156,7 +199,7 @@ class UserInput:
         if self.in_data.has_key(name):
             return self._handle_input(self.in_data[name])
         else: 
-            self.log_err('Invalid prompt')
+            log_err('Invalid prompt')
 
 
 def expNumRe(text):
@@ -180,6 +223,11 @@ def expNumRe(text):
 
     return explist
 
+
+def log_err(errtext):
+    print '***ERROR: ' + errtext
+    sys.exit(1)
+
 def format_output(text):
     num = len(text) + 4
     print '*' * num
@@ -191,10 +239,11 @@ def user_input():
 
     u = UserInput()
     
+    # TODO check rpm file existence
     traf_rpm = u.getinput('traf_rpm')
 
     mgr_url = u.getinput('mgr_url')
-    if ('http:' or 'https:') in mgr_url: u.log_err('Do not include http or https')
+    if ('http:' or 'https:') in mgr_url: log_err('Do not include http or https')
     mgr_user = u.getinput('mgr_user')
     mgr_pwd = u.getinput('mgr_pwd')
 
@@ -206,7 +255,7 @@ def user_input():
         node_list = ' '.join(expNumRe(u.getinput('node_list')))
         print ' === NODE LIST ===\n' + node_list
         confirm = u.getinput('confirm')
-        if confirm == 'N': u.log_err('\nAborted...')
+        if confirm == 'N': log_err('\nAborted...')
     
     traf_start = u.getinput('traf_start')
     traf_pwd = u.getinput('traf_pwd')
@@ -218,7 +267,7 @@ def user_input():
     dcs_ha = u.getinput('dcs_ha')
     ldap_security = u.getinput('ldap_security')
 
-    cfgs = {
+    user_cfgs = {
     'traf_rpm':          traf_rpm,
     'mgr_url':           mgr_url,
     'mgr_user':          mgr_user,
@@ -235,49 +284,132 @@ def user_input():
     'dcs_ha':            dcs_ha,
     'ldap_security':     ldap_security,
     }
-    return json.dumps(cfgs)
+    return user_cfgs
 
+def pre_check():
+    """ check required packages should be installed """
+    # TODO  ansible should be installed
+    pass
 
 def main():
     """ esgyndb_installer main loop """
 
     format_output('EsgynDB INSTALLATION START')
 
-    installer_loc = sys.path[0]
-    config_file = installer_loc + '/group_vars/all.yml'
+    pre_check()
 
+    cfgs = {}
     # TODO
+    # add func to save user input to a tmp file and reload it when re-run
+    # suport ldap security / dcs ha
     # overwrite config_file with --config-file option
     # config_file = xxx
 
+    installer_loc = sys.path[0]
+    config_file = installer_loc + '/esgyndb_config.json'
+    p = ParseJson(config_file)
     if not os.path.exists(config_file): 
         cfgs = user_input()
-        # generate config file first
-        cmd = 'ansible-playbook %s/install.yml -e \'%s\' -e installer_loc=%s -i %s/default_hosts --tags=var_tag' % \
-            (installer_loc, cfgs, installer_loc, installer_loc)
-        rc = os.system(cmd)
-        if rc: sys.exit(rc)
+        
+        hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
 
-        # start installing using generated config file 'group_vars/all.yml'
-        cmd = 'ansible-playbook %s/install.yml -e installer_loc=%s -i %s/default_hosts --tags=install_tag' % \
-            (installer_loc, installer_loc, installer_loc)
-        rc = os.system(cmd)
-        if rc: sys.exit(rc)
+        clusters = hg.get_content('http://%s/api/v1/clusters' % cfgs['mgr_url'])
+        # get cluster name, assume only one cluster managed
+        cluster_name = clusters['items'][0]['name']
+
+        # get list of HBase RegionServer node if node_list is not specified
+        if not cfgs['node_list']:
+            cm = hg.get_content('http://%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+            hostids = []
+            hostnames = []
+            for c in cm['clusters']:
+                if c['displayName'] == cluster_name:
+                    for s in c['services']:
+                        if s['type'] == 'HBASE':
+                            for r in s['roles']:
+                                if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
+
+            for i in hostids:
+                for h in cm['hosts']:
+                    if i == h['hostId']: hostnames.append(h['hostname'])
+
+            hostnames.sort()
+            node_list = ' '.join(hostnames)
+            node_list = ' ' + node_list
+            cfgs['node_list'] = node_list
+
+        # set other config to cfgs
+        cfgs['my_nodes'] = node_list.replace(' ', ' -w ')
+        cfgs['first_node'] = node_list.split()[0]
+        cfgs['cluster_name'] = cluster_name.replace(' ','%20')
+
+        cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
+        cfgs['rpm_basename'] = 'trafodion'
+
+        # save config file as json format
+        print '\n Generating json file to save variables ... \n'
+        p.jsave(cfgs)
+
+    # config file exists
     else:
-        # start installing using specified config file
-        cmd = 'ansible-playbook %s/install.yml -e @%s -e installer_loc=%s -i %s/default_hosts --tags=install_tag' % \
-            (installer_loc, config_file, installer_loc, installer_loc)
-        rc = os.system(cmd)
-        if rc: sys.exit(rc)
+        print '\n Loading variable json file ... \n'
+        cfgs = p.jload()
+
+
+    ##############################
+    # generate ansible config&hosts file
+    ##############################
+    print '\n Generating ansible config and hosts file ... \n'
+    node_array = cfgs['node_list'].split()
+    first_node = node_array[0]
+    node_array = [ node + '\n' for node in node_array ]
+
+    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
+    hosts_file = installer_loc + '/hosts'
+    ts = time.strftime('%y%m%d_%H%M')
+
+    try:
+        with open(ansible_cfg, 'w') as f:
+            f.write('[defaults]\n')
+            f.write('log_path = $HOME/esgyndb_install_' + ts + '.log\n')
+            f.write('inventory =' + hosts_file + '\n')
+            f.write('host_key_checking = False\n')
+            f.write('display_skipped_hosts = False\n')
+    except IOError:
+        log_err('Failed to open ansible.cfg file')
+
+    try:
+        with open(hosts_file, 'w') as f:
+            f.write('[trafnodes]\n')
+            f.writelines(node_array)
+            f.write('\n[firstnode]\n')
+            f.write(first_node)
+    except IOError:
+        log_err('Failed to open hosts file')
+
+    #############################
+    # calling ansible to install
+    #############################
+    format_output('Ansible Installation start, input remote hosts SSH passwd if prompt')
+    cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\' -k' % \
+        (installer_loc, installer_loc, json.dumps(cfgs))
+
+    # get user from parameters
+    # remote_user = xxx
+    remote_user = ''
+    if remote_user: cmd += ' -u %s' % remote_user
+
+    rc = os.system(cmd)
+    if rc: sys.exit(rc)
 
     format_output('EsgynDB INSTALLATION COMPLETE')
 
-    # rename config file when successfully installed
-    ts = date.today().strftime('%Y%m%d_%H%M')
-    try:
-        os.rename(config_file, config_file + '.bak' + ts)
-    except OSError:
-        pass
+#    # rename config file when successfully installed
+#    ts = time.strftime('%y%m%d_%H%M')
+#    try:
+#        os.rename(config_file, config_file + '.bak' + ts)
+#    except OSError:
+#        pass
     
 if __name__ == "__main__":
     try:

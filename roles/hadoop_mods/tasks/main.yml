@@ -1,4 +1,3 @@
 ---
 - include: modify_cdh.yml
 - include: restart_cdh.yml
-- include: hdfs_cmd.yml

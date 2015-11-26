@@ -1,4 +1,5 @@
 ---
+# TODO: remove related system configs
 - name: Check trafodion home existence
   stat: path=/home/trafodion/
   register: trafuser

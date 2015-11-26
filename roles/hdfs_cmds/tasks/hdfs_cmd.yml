@@ -1,0 +1,18 @@
+# TODO: set user to varible
+- name: Wait to make sure HDFS is fully restarted and out of safemode
+  shell: "hdfs dfsadmin -safemode wait"
+  sudo_user: hdfs
+  sudo: yes
+
+- name: Create Trafodion needed folders in HDFS
+  script: create_hdfs_dir
+  ignore_errors: true
+  sudo_user: hdfs
+  sudo: yes
+
+- name: Setting HDFS ACLs for snapshot scan support
+  script: set_hdfs_acl
+  ignore_errors: true
+  sudo_user: hdfs
+  sudo: yes
+

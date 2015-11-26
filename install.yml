@@ -1,9 +1,9 @@
 ---
-- hosts: 
-  - localhost
-  roles:
-  - traf_vars
-  tags: var_tag
+#- hosts: 
+#  - localhost
+#  roles:
+#  - traf_vars
+#  tags: var_tag
 
 - hosts: 
   - trafnodes
@@ -11,13 +11,15 @@
   - traf_check
   - traf_rpm
   - traf_setup
-  tags: install_tag
 
+
+- hosts:
+  - localhost
+  roles:
+  - hadoop_mods
 
 - hosts:
   - firstnode
   roles:
-  - hadoop_mods
+  - hdfs_cmds
   - traf_start
-  tags: install_tag
-

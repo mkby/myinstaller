@@ -17,7 +17,3 @@
   retries: 30
   delay: 20
 
-- name: Wait to make sure HDFS is fully restarted and out of safemode
-  shell: "hdfs dfsadmin -safemode wait"
-  sudo_user: hdfs
-  sudo: yes

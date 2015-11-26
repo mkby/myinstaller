@@ -74,7 +74,7 @@
   sudo: yes
 
 - name: Generate servers file
-  script: gen_dcsserver.py {{ dcs_srv_file }} {{ dcs_count }} {{ node_list }}
+  script: gen_dcsserver.py {{ dcs_srv_file }} {{ dcs_cnt_per_node }} {{ node_list }}
   sudo: yes
 
 - name: Set dcs install path in sqenvcom.sh
