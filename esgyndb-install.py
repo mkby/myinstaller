@@ -4,9 +4,16 @@ import sys
 import os
 import re
 import json
-import httplib2
+# httplib2 is not installed by default
+try:
+    import httplib2
+except ImportError:
+    print 'Python module httplib2 is not found. Install python-httplib2 package first.'
+    sys.exit(1)
+
 import getpass
 import time
+from optparse import OptionParser
 from subprocess import Popen, PIPE
 
 class ParseJson:
@@ -288,25 +295,53 @@ def user_input():
 
 def pre_check():
     """ check required packages should be installed """
-    # TODO  ansible should be installed
-    pass
+
+    # check ansible is installed
+    rc = os.system('which ansible-playbook >/dev/null 2>&1')
+    if rc: log_err('\'ansible\' is not found, please install it first')
+
 
 def main():
     """ esgyndb_installer main loop """
 
-    format_output('EsgynDB INSTALLATION START')
+    # TODO
+    # add func to save user input to a tmp file and reload it when re-run
+    # suport ldap security / dcs ha in user input
 
     pre_check()
 
-    cfgs = {}
-    # TODO
-    # add func to save user input to a tmp file and reload it when re-run
-    # suport ldap security / dcs ha
-    # overwrite config_file with --config-file option
-    # config_file = xxx
+    ################################
+    # script options and usage info
+    ################################
+    usage = 'usage: %prog [options]\n'
+    usage += '  EsgynDB install wrapper script. It will create ansible\n\
+  config, variables, hosts file and call ansible to install EsgynDB.'
+    parser = OptionParser(usage=usage)
+    parser.add_option("-f", "--config-file", dest="file", metavar="FILE",
+                help="Json format file. If provided, all install prompts \
+                      will be taken from this file and not prompted for.")
+    parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
+                help="Provide ssh login user for remote server, \
+                      if not provided, use current login user as default.")
+    parser.add_option("-d", "--disable-pass", action="store_false", dest="pass", default=True,
+                help="Do not prompt SSH login password for remote hosts. \
+                      If set, be sure passwordless ssh is configured.")
 
+    (options, args) = parser.parse_args()
+    config_file = options['file']
+    remote_user = options['user']
+    disable_pass = options['pass']
+
+    #######################################
+    # get user input and gen variable file
+    #######################################
+    format_output('EsgynDB INSTALLATION START')
+    cfgs = {}
     installer_loc = sys.path[0]
-    config_file = installer_loc + '/esgyndb_config.json'
+
+    if not config_file:
+        config_file = installer_loc + '/esgyndb_config.json'
+
     p = ParseJson(config_file)
     if not os.path.exists(config_file): 
         cfgs = user_input()
@@ -356,9 +391,9 @@ def main():
         cfgs = p.jload()
 
 
-    ##############################
+    #####################################
     # generate ansible config&hosts file
-    ##############################
+    #####################################
     print '\n Generating ansible config and hosts file ... \n'
     node_array = cfgs['node_list'].split()
     first_node = node_array[0]
@@ -391,25 +426,25 @@ def main():
     # calling ansible to install
     #############################
     format_output('Ansible Installation start, input remote hosts SSH passwd if prompt')
-    cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\' -k' % \
+
+    cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
         (installer_loc, installer_loc, json.dumps(cfgs))
 
-    # get user from parameters
-    # remote_user = xxx
-    remote_user = ''
+    if not disable_pass: cmd += ' -k'
     if remote_user: cmd += ' -u %s' % remote_user
 
     rc = os.system(cmd)
-    if rc: sys.exit(rc)
+    if rc: log_err('Failed to install EsgynDB by ansible, please check log for details')
 
     format_output('EsgynDB INSTALLATION COMPLETE')
 
-#    # rename config file when successfully installed
-#    ts = time.strftime('%y%m%d_%H%M')
-#    try:
-#        os.rename(config_file, config_file + '.bak' + ts)
-#    except OSError:
-#        pass
+    # rename config file when successfully installed
+    # so next time user can input new variables for a new install
+    ts = time.strftime('%y%m%d_%H%M')
+    try:
+        os.rename(config_file, config_file + '.bak' + ts)
+    except OSError:
+        log_err('Cannot rename config file')
     
 if __name__ == "__main__":
     try:
