@@ -336,7 +336,7 @@ def user_input():
     g('mgr_user')
     g('mgr_pwd')
 
-    # test url
+    # validate url
     hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
     hg.get_content('http://' + cfgs['mgr_url'], test=True)
 
@@ -432,17 +432,20 @@ def main():
         
         hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
 
-        clusters = hg.get_content('http://%s/api/v1/clusters' % cfgs['mgr_url'])
-        # get cluster name and version, assume only one cluster being managed
-        cluster_name = clusters['items'][0]['name']
-        cluster_version = clusters['items'][0]['version']
+        cm = hg.get_content('http://%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+        # get cluster info, assume only one cluster being managed
+        cluster_name = cm['clusters'][0]['displayName']
+        cluster_version = cm['clusters'][0]['version']
+        fullversion = cm['clusters'][0]['fullVersion']
+
         # TODO: support HDP later
         if not 'CDH' in cluster_version:
             log_err('Cannot detect Cloudera, currently EsgynDB only supports CDH')
+        elif not '5.4' in fullversion:
+            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
 
         # get list of HBase RegionServer node if node_list is not specified
         if not cfgs['node_list']:
-            cm = hg.get_content('http://%s/api/v6/cm/deployment' % cfgs['mgr_url'])
             hostids = []
             hostnames = []
             for c in cm['clusters']:
@@ -522,7 +525,7 @@ def main():
         cmd += ' -k'
         print 'Input remote hosts SSH passwd:\n'
 
-    if options.user: cmd += ' -u %s' % remote_user
+    if options.user: cmd += ' -u %s' % options.user
 
     rc = os.system(cmd)
     if rc: log_err('Failed to install EsgynDB by ansible, please check log for details')
