@@ -8,13 +8,31 @@ import json
 try:
     import httplib2
 except ImportError:
-    print 'Python module httplib2 is not found. Install python-httplib2 package first.'
+    print 'Python module httplib2 is not found. Install python-httplib2 or ansible first.'
     sys.exit(1)
 
 import getpass
 import time
 from optparse import OptionParser
 from subprocess import Popen, PIPE
+
+# init global cfgs
+cfgs = {
+'traf_rpm':        '', 'mgr_url':         '',  
+'mgr_user':        '', 'mgr_pwd':         '',  
+'java_home':       '', 'use_hbase_node':  '',  
+'node_list':       '', 'traf_start':      '',  
+'traf_pwd':        '', 'hdfs_user':       '',  
+'hbase_user':      '', 'hbase_group':     '',  
+'dcs_cnt_per_node':'', 'dcs_ha':          '',  
+'ldap_security':   '', 'dcs_ip':          '',
+'dcs_interface':   '', 'dcs_bknodes':     '',
+'ldap_security':   '', 'ldap_hosts':      '',
+'ldap_port':       '', 'ldap_identifiers':'',
+'ldap_encrypt':    '', 'ldap_certpath':   '',
+'ldap_user':       '', 'ldap_pwd':        '',
+}
+tmp_file = '/tmp/esgyndb_config_temp'
 
 class ParseJson:
     """ 
@@ -60,7 +78,6 @@ class HttpGet:
             log_err('No json format found in http content')
             
 
-
 class UserInput:
     def __init__(self):
         self.in_data = {
@@ -87,9 +104,21 @@ class UserInput:
             },
             'dcs_ha':
             {
-                'prompt':'Enable DCS HA',
+                'prompt':'Enable DCS High Avalability',
                 'default':'N',
                 'isYN':True
+            },
+            'dcs_ip':
+            {
+                'prompt':'Enter Floating IP address for DCS HA',
+            },
+            'dcs_interface':
+            {
+                'prompt':'Enter interface for Floating IP address (example: eth0)',
+            },
+            'dcs_bknodes':
+            {
+                'prompt':'Enter DCS Backup Master Nodes for DCS HA (blank separated)',
             },
             'ldap_security':
             {
@@ -104,7 +133,33 @@ class UserInput:
             'ldap_port':
             {
                 'prompt':'Enter LDAP Port number (Example: 389 for no encryption or TLS, 636 for SSL)',
-                'default':389,
+                'default':'389',
+                'isdigit':True
+            },
+            'ldap_identifiers':
+            {
+                'prompt':'Enter all LDAP unique identifiers (blank separated)',
+            },
+            'ldap_encrypt':
+            {
+                'prompt':'Enter LDAP Encryption Level (0: Encryption not used, 1: SSL, 2: TLS)',
+                'default':'0',
+                'isdigit':True
+            },
+            'ldap_certpath':
+            {
+                'prompt':'Enter full path to TLS certificate',
+            },
+            'ldap_user':
+            {
+                'prompt':'Enter Search user name (if required)',
+                'default':'None',
+            },
+            'ldap_pwd':
+            {
+                'prompt':'Enter Search password (if required)',
+                'default':'None',
+                'ispasswd':True
             },
             'java_home':
             {
@@ -114,7 +169,8 @@ class UserInput:
             'dcs_cnt_per_node':
             {
                 'prompt':'Enter number of DCS client connections per node',
-                'default':'8'
+                'default':'8',
+                'isdigit':True
             },
             'mgr_url':
             {
@@ -139,7 +195,8 @@ class UserInput:
             },
             'traf_rpm':
             {
-                'prompt':'Enter full path to Trafodion RPM file'
+                'prompt':'Enter full path to Trafodion RPM file',
+                'isexist': True
             },
             'node_list':
             {
@@ -160,14 +217,15 @@ class UserInput:
         }
     
     
-    def _handle_input(self, args):
+    def _handle_input(self, args, userdef):
         prompt = args['prompt']
-        default = ''
-        ispasswd = ''
-        isYN = ''
-        if args.has_key('default'): default = args['default']
+        default = userdef
+        ispasswd = isYN = isdigit = isexist = ''
+        if (not default) and args.has_key('default'): default = args['default']
         if args.has_key('ispasswd'): ispasswd = args['ispasswd']
         if args.has_key('isYN'): isYN = args['isYN']
+        if args.has_key('isdigit'): isdigit = args['isdigit']
+        if args.has_key('isexist'): isexist = args['isexist']
     
         if isYN:
             prompt = prompt + ' (Y/N) '
@@ -192,19 +250,30 @@ class UserInput:
             if not answer and default: answer = default
     
         # check answer value basicly
-        if isYN:
-            answer = answer.upper()
-            if answer != 'Y' and answer != 'N':
-                log_err('Invalid parameter, should be \'Y|y|N|n\'')
+        answer = answer.strip()
+        if answer:
+            if isYN:
+                answer = answer.upper()
+                if answer != 'Y' and answer != 'N':
+                    log_err('Invalid parameter, should be \'Y|y|N|n\'')
+            elif isdigit:
+                if not answer.isdigit():
+                    log_err('Invalid parameter, should be a number')
+            elif isexist:
+                if not os.path.exists(answer):
+                    log_err('\'%s\' doesn\'t exist' % answer)
+            else:
+                pass
         else:
-            if not answer:
-                log_err('Empty value')
+            log_err('Empty value')
         
         return answer
     
-    def getinput(self, name):
+    def getinput(self, name, userdef):
         if self.in_data.has_key(name):
-            return self._handle_input(self.in_data[name])
+            # save configs to global dict
+            cfgs[name] = self._handle_input(self.in_data[name], userdef)
+            return cfgs[name]
         else: 
             log_err('Invalid prompt')
 
@@ -232,7 +301,13 @@ def expNumRe(text):
 
 
 def log_err(errtext):
+
     print '***ERROR: ' + errtext
+    global tmp_file
+    # save tmp config files
+    tp = ParseJson(tmp_file)
+    tp.jsave(cfgs)
+
     sys.exit(1)
 
 def format_output(text):
@@ -242,56 +317,63 @@ def format_output(text):
     print '*' * num
 
 def user_input():
-    """ get user's input """
-
+    """ get user's input and check input value """
     u = UserInput()
     
-    # TODO check rpm file existence
-    traf_rpm = u.getinput('traf_rpm')
+    global cfgs, tmp_file
+    # load from temp storaged config file
+    if os.path.exists(tmp_file):
+        tp = ParseJson(tmp_file)
+        cfgs = tp.jload()
 
-    mgr_url = u.getinput('mgr_url')
+    g = lambda n: u.getinput(n, cfgs[n])
+
+    g('java_home')
+    g('traf_rpm')
+
+    mgr_url = g('mgr_url')
     if ('http:' or 'https:') in mgr_url: log_err('Do not include http or https')
-    mgr_user = u.getinput('mgr_user')
-    mgr_pwd = u.getinput('mgr_pwd')
 
-    java_home = u.getinput('java_home')
+    g('mgr_user')
+    g('mgr_pwd')
 
-    use_hbase_node = u.getinput('use_hbase_node')
-    node_list = ''
-    if  use_hbase_node == 'N':
-        node_list = ' '.join(expNumRe(u.getinput('node_list')))
+    if  g('use_hbase_node') == 'N':
+        node_list = ' '.join(expNumRe(g('node_list')))
         print ' === NODE LIST ===\n' + node_list
-        confirm = u.getinput('confirm')
+        confirm = u.getinput('confirm', '')
         if confirm == 'N': log_err('\nAborted...')
+        for node in node_list.split():
+            rc = os.system('ping -c 1 %s >/dev/null 2>&1' % node)
+            if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
     
-    traf_start = u.getinput('traf_start')
-    traf_pwd = u.getinput('traf_pwd')
+    g('traf_pwd')
+    g('traf_start')
+    g('hdfs_user')
+    g('hbase_user')
+    g('hbase_group')
+    g('dcs_cnt_per_node')
 
-    hdfs_user = u.getinput('hdfs_user')
-    hbase_user = u.getinput('hbase_user')
-    hbase_group = u.getinput('hbase_group')
-    dcs_cnt_per_node = u.getinput('dcs_cnt_per_node')
-    dcs_ha = u.getinput('dcs_ha')
-    ldap_security = u.getinput('ldap_security')
+    # ldap security
+    if g('ldap_security') == 'Y':
+        g('ldap_hosts')
+        g('ldap_port')
+        g('ldap_identifiers')
+        ldap_encrypt = g('ldap_encrypt')
+        if  ldap_encrypt == '1' or 'ldap_encrypt' == '2':
+            g('ldap_certpath')
+        elif ldap_encrypt == '0':
+            pass
+        else:
+            log_err('Invalid ldap encryption level')
 
-    user_cfgs = {
-    'traf_rpm':          traf_rpm,
-    'mgr_url':           mgr_url,
-    'mgr_user':          mgr_user,
-    'mgr_pwd':           mgr_pwd,
-    'java_home':         java_home,
-    'use_hbase_node':    use_hbase_node,
-    'node_list':         node_list,
-    'traf_start':        traf_start,
-    'traf_pwd':          traf_pwd,
-    'hdfs_user':         hdfs_user,
-    'hbase_user':        hbase_user,
-    'hbase_group':       hbase_group,
-    'dcs_cnt_per_node':  dcs_cnt_per_node,
-    'dcs_ha':            dcs_ha,
-    'ldap_security':     ldap_security,
-    }
-    return user_cfgs
+        g('ldap_user')
+        g('ldap_pwd')
+
+    # DCS HA
+    if g('dcs_ha') == 'Y':
+        g('dcs_ip')
+        g('dcs_interface')
+        g('dcs_bknodes')
 
 def pre_check():
     """ check required packages should be installed """
@@ -304,10 +386,6 @@ def pre_check():
 def main():
     """ esgyndb_installer main loop """
 
-    # TODO
-    # add func to save user input to a tmp file and reload it when re-run
-    # suport ldap security / dcs ha in user input
-
     pre_check()
 
     ################################
@@ -317,40 +395,47 @@ def main():
     usage += '  EsgynDB install wrapper script. It will create ansible\n\
   config, variables, hosts file and call ansible to install EsgynDB.'
     parser = OptionParser(usage=usage)
-    parser.add_option("-f", "--config-file", dest="file", metavar="FILE",
+    parser.add_option("-f", "--config-file", dest="cfgfile", metavar="FILE",
                 help="Json format file. If provided, all install prompts \
                       will be taken from this file and not prompted for.")
     parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
                 help="Provide ssh login user for remote server, \
                       if not provided, use current login user as default.")
-    parser.add_option("-d", "--disable-pass", action="store_false", dest="pass", default=True,
+    parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=True,
                 help="Do not prompt SSH login password for remote hosts. \
                       If set, be sure passwordless ssh is configured.")
 
     (options, args) = parser.parse_args()
-    config_file = options['file']
-    remote_user = options['user']
-    disable_pass = options['pass']
 
     #######################################
     # get user input and gen variable file
     #######################################
-    format_output('EsgynDB INSTALLATION START')
-    cfgs = {}
+    format_output('EsgynDB Installation Start')
+    global cfgs
     installer_loc = sys.path[0]
-
-    if not config_file:
-        config_file = installer_loc + '/esgyndb_config.json'
+    def_cfgfile = installer_loc + '/esgyndb_config'
+    if options.cfgfile:
+        if not os.path.exists(options.cfgfile): 
+            log_err('Cannot find config file \'%s\'' % options.cfgfile)
+        config_file = options.cfgfile
+    else:
+        config_file = def_cfgfile
 
     p = ParseJson(config_file)
+
+    # not specified config file and default config file doesn't exist either
     if not os.path.exists(config_file): 
-        cfgs = user_input()
+        user_input()
         
         hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
 
         clusters = hg.get_content('http://%s/api/v1/clusters' % cfgs['mgr_url'])
-        # get cluster name, assume only one cluster managed
+        # get cluster name, assume only one cluster being managed
         cluster_name = clusters['items'][0]['name']
+        cluster_version = clusters['items'][0]['version']
+        # TODO: support HDP later
+        if not 'CDH' in cluster_version:
+            log_err('Cannot detect Cloudera, currently EsgynDB only supports CDH')
 
         # get list of HBase RegionServer node if node_list is not specified
         if not cfgs['node_list']:
@@ -382,19 +467,19 @@ def main():
         cfgs['rpm_basename'] = 'trafodion'
 
         # save config file as json format
-        print '\n Generating json file to save variables ... \n'
+        print '\n** Generating json file to save variables ... \n'
         p.jsave(cfgs)
 
     # config file exists
     else:
-        print '\n Loading variable json file ... \n'
+        print '\n** Loading variable json file ... \n'
         cfgs = p.jload()
 
 
     #####################################
     # generate ansible config&hosts file
     #####################################
-    print '\n Generating ansible config and hosts file ... \n'
+    print '\n** Generating ansible config and hosts file ... \n'
     node_array = cfgs['node_list'].split()
     first_node = node_array[0]
     node_array = [ node + '\n' for node in node_array ]
@@ -425,29 +510,41 @@ def main():
     #############################
     # calling ansible to install
     #############################
-    format_output('Ansible Installation start, input remote hosts SSH passwd if prompt')
+    format_output('Ansible Installation start')
 
     cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
         (installer_loc, installer_loc, json.dumps(cfgs))
 
-    if not disable_pass: cmd += ' -k'
-    if remote_user: cmd += ' -u %s' % remote_user
+    if not options.dispass: 
+        cmd += ' -k'
+        print 'Input remote hosts SSH passwd:\n'
+
+    if options.user: cmd += ' -u %s' % remote_user
 
     rc = os.system(cmd)
     if rc: log_err('Failed to install EsgynDB by ansible, please check log for details')
 
-    format_output('EsgynDB INSTALLATION COMPLETE')
+    format_output('EsgynDB Installation Complete')
 
-    # rename config file when successfully installed
+    ################
+    # clean up work
+    ################
+    # rename default config file when successfully installed
     # so next time user can input new variables for a new install
+    # or specify the backup config file to install again
     ts = time.strftime('%y%m%d_%H%M')
     try:
         os.rename(config_file, config_file + '.bak' + ts)
     except OSError:
         log_err('Cannot rename config file')
+
+    # remove temp config file
+    os.remove(tmp_file)
     
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
+        tp = ParseJson(tmp_file)
+        tp.jsave(cfgs)
         print '\nAborted...'
