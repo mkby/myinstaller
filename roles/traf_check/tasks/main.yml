@@ -42,9 +42,9 @@
   sudo: yes
 
 - set_fact:
-    traf_init: "y"
+    traf_init: "Y"
 
 - set_fact:
-    traf_init: "n"
+    traf_init: "N"
   when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
   

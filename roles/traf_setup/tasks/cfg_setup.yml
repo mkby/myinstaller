@@ -39,42 +39,44 @@
     interface: "{{ net_interface.stdout }}"
     zk_hosts: "{{ zookeeper_quorum.stdout }}"
     dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
-    bk_master_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
+    dcs_bkmaster_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
     dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
     rest_site_file: "{{ sq_root }}/rest-{{ traf_ver }}/conf/rest-site.xml"
+    dcs_backup_nodes: "{{ dcs_bknodes.split() }}"
 
 - name: Generate dcs-site.xml
   template: src=dcs-site.xml.j2 dest={{ dcs_site_file }}
   sudo: yes
-  when: dcs_ha!='y'
+  when: dcs_ha=='N'
 
 - name: Generate dcs-site.xml for DCS HA
   template: src=dcs-site-ha.xml.j2 dest={{ dcs_site_file }}
   sudo: yes
-  when: dcs_ha=='y'
+  when: dcs_ha=='Y'
 
 - name: Generate sudoers config for trafodion user
   copy: src=trafodion_sudoer_cfg dest=/etc/sudoers.d/
   sudo: yes
-  when: dcs_ha=='y'
+  when: dcs_ha=='Y'
 
 - name: Mod trafci for DCS HA
-  replace: dest={{ sq_root }}/trafci/bin/trafci regexp='localhost' replace={{ floating_ip }}
+  replace: dest={{ sq_root }}/trafci/bin/trafci regexp='localhost' replace={{ dcs_ip }}
   sudo: yes
-  when: dcs_ha=='y'
+  when: dcs_ha=='Y'
 
 - name: Mod backup-master file
-  lineinfile: dest=bk_master_file line={{ item }}
-  with_items: dcs_bakcup_hosts
+  lineinfile: dest=dcs_bkmaster_file line={{ item }}
+  with_items: dcs_backup_nodes
   sudo: yes
-  when: dcs_ha=='y'
+  when: dcs_ha=='Y'
 
 - name: Generate rest-site.xml
   template: src=rest-site.xml.j2 dest={{ rest_site_file }}
   sudo: yes
 
 - name: Generate servers file
-  script: gen_dcsserver.py {{ dcs_srv_file }} {{ dcs_cnt_per_node }} {{ node_list }}
+  lineinfile: dest={{ dcs_srv_file }} line="{{ item }} {{ dcs_cnt_per_node }}"
+  with_items: node_list.split()
   sudo: yes
 
 - name: Set dcs install path in sqenvcom.sh

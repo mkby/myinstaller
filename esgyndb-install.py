@@ -65,17 +65,18 @@ class HttpGet:
         self.h = httplib2.Http(".cache")  
         self.h.add_credentials(self.user, self.passwd)
 
-    def get_content(self, url):
+    def get_content(self, url, test=False):
         self.url = url
         try:
             resp, content = self.h.request(self.url, "GET")  
         except:
             log_err('Failed to access manager URL ' + url)
 
-        try:
-            return json.loads(content)
-        except ValueError:
-            log_err('No json format found in http content')
+        if not test:
+            try:
+                return json.loads(content)
+            except ValueError:
+                log_err('No json format found in http content')
             
 
 class UserInput:
@@ -275,6 +276,7 @@ class UserInput:
             cfgs[name] = self._handle_input(self.in_data[name], userdef)
             return cfgs[name]
         else: 
+            # should not go to here, just in case
             log_err('Invalid prompt')
 
 
@@ -318,24 +320,25 @@ def format_output(text):
 
 def user_input():
     """ get user's input and check input value """
-    u = UserInput()
-    
     global cfgs, tmp_file
     # load from temp storaged config file
     if os.path.exists(tmp_file):
         tp = ParseJson(tmp_file)
         cfgs = tp.jload()
 
-    g = lambda n: u.getinput(n, cfgs[n])
+    g = lambda n: UserInput().getinput(n, cfgs[n])
 
     g('java_home')
     g('traf_rpm')
 
-    mgr_url = g('mgr_url')
-    if ('http:' or 'https:') in mgr_url: log_err('Do not include http or https')
-
+    if ('http:' or 'https:') in g('mgr_url'): 
+        log_err('Do not include http or https')
     g('mgr_user')
     g('mgr_pwd')
+
+    # test url
+    hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
+    hg.get_content('http://' + cfgs['mgr_url'], test=True)
 
     if  g('use_hbase_node') == 'N':
         node_list = ' '.join(expNumRe(g('node_list')))
@@ -359,7 +362,7 @@ def user_input():
         g('ldap_port')
         g('ldap_identifiers')
         ldap_encrypt = g('ldap_encrypt')
-        if  ldap_encrypt == '1' or 'ldap_encrypt' == '2':
+        if  ldap_encrypt == '1' or ldap_encrypt == '2':
             g('ldap_certpath')
         elif ldap_encrypt == '0':
             pass
@@ -430,7 +433,7 @@ def main():
         hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
 
         clusters = hg.get_content('http://%s/api/v1/clusters' % cfgs['mgr_url'])
-        # get cluster name, assume only one cluster being managed
+        # get cluster name and version, assume only one cluster being managed
         cluster_name = clusters['items'][0]['name']
         cluster_version = clusters['items'][0]['version']
         # TODO: support HDP later
@@ -467,12 +470,12 @@ def main():
         cfgs['rpm_basename'] = 'trafodion'
 
         # save config file as json format
-        print '\n** Generating json file to save variables ... \n'
+        print '\n** Generating json file to save configs ... \n'
         p.jsave(cfgs)
 
     # config file exists
     else:
-        print '\n** Loading variable json file ... \n'
+        print '\n** Loading configs from json file ... \n'
         cfgs = p.jload()
 
 
