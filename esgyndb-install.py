@@ -263,8 +263,6 @@ class UserInput:
             elif isexist:
                 if not os.path.exists(answer):
                     log_err('\'%s\' doesn\'t exist' % answer)
-            else:
-                pass
         else:
             log_err('Empty value')
         
@@ -326,7 +324,8 @@ def user_input():
         tp = ParseJson(tmp_file)
         cfgs = tp.jload()
 
-    g = lambda n: UserInput().getinput(n, cfgs[n])
+    u = UserInput()
+    g = lambda n: u.getinput(n, cfgs[n])
 
     g('java_home')
     g('traf_rpm')
@@ -344,7 +343,11 @@ def user_input():
         node_list = ' '.join(expNumRe(g('node_list')))
         print ' === NODE LIST ===\n' + node_list
         confirm = u.getinput('confirm', '')
-        if confirm == 'N': log_err('\nAborted...')
+        if confirm == 'N': 
+            log_err('\nAborted...')
+        else:
+            cfgs['node_list'] = node_list
+
         for node in node_list.split():
             rc = os.system('ping -c 1 %s >/dev/null 2>&1' % node)
             if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
@@ -460,13 +463,11 @@ def main():
                     if i == h['hostId']: hostnames.append(h['hostname'])
 
             hostnames.sort()
-            node_list = ' '.join(hostnames)
-            node_list = ' ' + node_list
-            cfgs['node_list'] = node_list
+            cfgs['node_list'] = ' ' + ' '.join(hostnames)
 
         # set other config to cfgs
-        cfgs['my_nodes'] = node_list.replace(' ', ' -w ')
-        cfgs['first_node'] = node_list.split()[0]
+        cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
+        cfgs['first_node'] = cfgs['node_list'].split()[0]
         cfgs['cluster_name'] = cluster_name.replace(' ','%20')
 
         cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
