@@ -251,7 +251,7 @@ class UserInput:
             if not answer and default: answer = default
     
         # check answer value basicly
-        answer = answer.strip()
+        answer = answer.rstrip()
         if answer:
             if isYN:
                 answer = answer.upper()
@@ -410,6 +410,8 @@ def main():
     parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=True,
                 help="Do not prompt SSH login password for remote hosts. \
                       If set, be sure passwordless ssh is configured.")
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
+                help="Verbose mode for ansible.")
 
     (options, args) = parser.parse_args()
 
@@ -526,10 +528,12 @@ def main():
         cmd += ' -k'
         print 'Input remote hosts SSH passwd:\n'
 
+    if options.verbose: cmd += ' -v'
     if options.user: cmd += ' -u %s' % options.user
 
     rc = os.system(cmd)
-    if rc: log_err('Failed to install EsgynDB by ansible, please check log for details')
+    if rc: log_err('Failed to install EsgynDB by ansible, please check log for details.\n\
+Double check config file \'%s\' to make sure nothing is wrong.' % config_file)
 
     format_output('EsgynDB Installation Complete')
 
@@ -541,12 +545,14 @@ def main():
     # or specify the backup config file to install again
     ts = time.strftime('%y%m%d_%H%M')
     try:
-        os.rename(config_file, config_file + '.bak' + ts)
+        # only rename default config file
+        if config_file == def_cfgfile:
+            os.rename(config_file, config_file + '.bak' + ts)
     except OSError:
         log_err('Cannot rename config file')
 
     # remove temp config file
-    os.remove(tmp_file)
+    if os.path.exists(tmp_file): os.remove(tmp_file)
     
 if __name__ == "__main__":
     try:

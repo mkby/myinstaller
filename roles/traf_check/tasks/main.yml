@@ -37,7 +37,7 @@
 
 - name: Stop Trafodion if it's running
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
-  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and trafstat.stdout=='1'
   sudo_user: trafodion
   sudo: yes
 

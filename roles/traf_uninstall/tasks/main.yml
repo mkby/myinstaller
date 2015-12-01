@@ -5,7 +5,7 @@
   register: trafuser
   
 - name: Stop trafodion processes if exist
-  shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
+  shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall; sleep 5"
   sudo: yes
   sudo_user: trafodion
   ignore_errors: true

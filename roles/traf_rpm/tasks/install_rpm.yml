@@ -38,7 +38,7 @@
 
 - name: Reinstall trafodion RPM if already installed
   shell: "rpm -i /tmp/{{ rpm_name }} --force"
-  when: rpm_installed.changed==False
+  when: rpm_installed.changed!=True
   sudo: yes
 
 - name: Create trafodion user if not exists

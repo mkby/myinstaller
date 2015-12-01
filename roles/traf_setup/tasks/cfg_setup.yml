@@ -65,13 +65,17 @@
   when: dcs_ha=='Y'
 
 - name: Mod backup-master file
-  lineinfile: dest=dcs_bkmaster_file line={{ item }}
+  lineinfile: dest={{ dcs_bkmaster_file }} line={{ item }}
   with_items: dcs_backup_nodes
   sudo: yes
   when: dcs_ha=='Y'
 
 - name: Generate rest-site.xml
   template: src=rest-site.xml.j2 dest={{ rest_site_file }}
+  sudo: yes
+
+- name: Clean up servers file
+  lineinfile: dest={{ dcs_srv_file }} line="localhost 2" state=absent
   sudo: yes
 
 - name: Generate servers file
