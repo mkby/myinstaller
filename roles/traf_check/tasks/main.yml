@@ -29,7 +29,7 @@
   sudo: yes
 
 - name: Check if Trafodion is running
-  shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'|echo -n"
+  shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'; echo -n"
   register: trafstat
   when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
   sudo_user: trafodion

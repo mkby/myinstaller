@@ -9,7 +9,7 @@
   sudo: yes
   sudo_user: trafodion
   ignore_errors: true
-  when: trafuser.stat.exists==True
+  when: inventory_hostname in groups['firstnode'] and trafuser.stat.exists==True
 
 - name: Uninstall trafodion RPM
   yum: name=trafodion state=absent

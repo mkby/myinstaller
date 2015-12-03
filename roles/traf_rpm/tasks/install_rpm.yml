@@ -24,28 +24,33 @@
       rpm_name: "{{ fullname.stdout }}"
 
     
-- name: Install trafodion RPM
+- name: Install trafodion RPM - CentOS
   yum: name="/tmp/{{ rpm_name }}" state=present
   sudo: yes
   register: rpm_installed
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
-- name: Install trafodion RPM
+- name: Install trafodion RPM - SuSE
   zypper: name="/tmp/{{ rpm_name }}" state=present
   sudo: yes
-  register: rpm_installed
+  register: rpm_installed_suse
   when: ansible_os_family == 'SuSE'
 
-- name: Reinstall trafodion RPM if already installed
+- name: Reinstall trafodion RPM if already installed - CentOS
   shell: "rpm -i /tmp/{{ rpm_name }} --force"
-  when: rpm_installed.changed!=True
+  when: (ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS') and rpm_installed.changed==False
+  sudo: yes
+
+- name: Reinstall trafodion RPM if already installed - SuSE
+  shell: "rpm -i /tmp/{{ rpm_name }} --force"
+  when: ansible_os_family == 'SuSE' and rpm_installed_suse.changed==False
   sudo: yes
 
 - name: Create trafodion user if not exists
   user: name=trafodion shell=/bin/bash groups=trafodion
   sudo: yes
 
-- name: Post config modify owner of trafodion directory
+- name: Modify owner of trafodion directory
   file: path=/home/trafodion/ state=directory recurse=yes owner=trafodion group=trafodion
   sudo: yes
 

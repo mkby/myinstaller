@@ -14,9 +14,9 @@ except ImportError:
 import getpass
 import time
 from optparse import OptionParser
-from subprocess import Popen, PIPE
+from glob import glob
 
-# init global cfgs
+# init global cfgs for user input
 cfgs = {
 'traf_rpm':        '', 'mgr_url':         '',  
 'mgr_user':        '', 'mgr_pwd':         '',  
@@ -33,6 +33,7 @@ cfgs = {
 'ldap_user':       '', 'ldap_pwd':        '',
 }
 tmp_file = '/tmp/esgyndb_config_temp'
+installer_loc = sys.path[0]
 
 class ParseJson:
     """ 
@@ -318,7 +319,7 @@ def format_output(text):
 
 def user_input():
     """ get user's input and check input value """
-    global cfgs, tmp_file
+    global cfgs, tmp_file, installer_loc
     # load from temp storaged config file
     if os.path.exists(tmp_file):
         tp = ParseJson(tmp_file)
@@ -328,7 +329,13 @@ def user_input():
     g = lambda n: u.getinput(n, cfgs[n])
 
     g('java_home')
-    g('traf_rpm')
+    # find trafodion rpm in installer folder, if more than one
+    # rpm found, use the first one
+    def_rpm = glob('%s/trafodion*.rpm' % installer_loc)
+    if def_rpm:
+        u.getinput('traf_rpm', def_rpm[0])
+    else:
+        g('traf_rpm')
 
     if ('http:' or 'https:') in g('mgr_url'): 
         log_err('Do not include http or https')
@@ -346,7 +353,7 @@ def user_input():
         if confirm == 'N': 
             log_err('\nAborted...')
         else:
-            cfgs['node_list'] = node_list
+            cfgs['node_list'] = ' ' + node_list
 
         for node in node_list.split():
             rc = os.system('ping -c 1 %s >/dev/null 2>&1' % node)
@@ -401,12 +408,14 @@ def main():
     usage += '  EsgynDB install wrapper script. It will create ansible\n\
   config, variables, hosts file and call ansible to install EsgynDB.'
     parser = OptionParser(usage=usage)
-    parser.add_option("-f", "--config-file", dest="cfgfile", metavar="FILE",
+    parser.add_option("-c", "--config-file", dest="cfgfile", metavar="FILE",
                 help="Json format file. If provided, all install prompts \
                       will be taken from this file and not prompted for.")
     parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
-                help="Provide ssh login user for remote server, \
+                help="Specify ssh login user for remote server, \
                       if not provided, use current login user as default.")
+    parser.add_option("-f", "--fork", dest="fork", metavar="FORK",
+                help="Specify number of parallel processes to use for ansible(default=5)" )
     parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=True,
                 help="Do not prompt SSH login password for remote hosts. \
                       If set, be sure passwordless ssh is configured.")
@@ -419,8 +428,7 @@ def main():
     # get user input and gen variable file
     #######################################
     format_output('EsgynDB Installation Start')
-    global cfgs
-    installer_loc = sys.path[0]
+    global cfgs, installer_loc
     def_cfgfile = installer_loc + '/esgyndb_config'
     if options.cfgfile:
         if not os.path.exists(options.cfgfile): 
@@ -449,27 +457,29 @@ def main():
         elif not '5.4' in fullversion:
             log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
 
-        # get list of HBase RegionServer node if node_list is not specified
+        # get list of HBase RegionServer nodes
+        hostids = []
+        rsnodes = []
+        for c in cm['clusters']:
+            if c['displayName'] == cluster_name:
+                for s in c['services']:
+                    if s['type'] == 'HBASE':
+                        for r in s['roles']:
+                            if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
+
+        for i in hostids:
+            for h in cm['hosts']:
+                if i == h['hostId']: rsnodes.append(h['hostname'])
+
+        rsnodes.sort()
+        # set trafodion node list the same as HBase RS nodes
         if not cfgs['node_list']:
-            hostids = []
-            hostnames = []
-            for c in cm['clusters']:
-                if c['displayName'] == cluster_name:
-                    for s in c['services']:
-                        if s['type'] == 'HBASE':
-                            for r in s['roles']:
-                                if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
-
-            for i in hostids:
-                for h in cm['hosts']:
-                    if i == h['hostId']: hostnames.append(h['hostname'])
-
-            hostnames.sort()
-            cfgs['node_list'] = ' ' + ' '.join(hostnames)
+            cfgs['node_list'] = ' ' + ' '.join(rsnodes)
 
         # set other config to cfgs
         cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
         cfgs['first_node'] = cfgs['node_list'].split()[0]
+        cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
         cfgs['cluster_name'] = cluster_name.replace(' ','%20')
 
         cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
@@ -491,6 +501,7 @@ def main():
     print '\n** Generating ansible config and hosts file ... \n'
     node_array = cfgs['node_list'].split()
     first_node = node_array[0]
+    first_rsnode = cfgs['first_rsnode']
     node_array = [ node + '\n' for node in node_array ]
 
     ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
@@ -503,7 +514,7 @@ def main():
             f.write('log_path = $HOME/esgyndb_install_' + ts + '.log\n')
             f.write('inventory =' + hosts_file + '\n')
             f.write('host_key_checking = False\n')
-            f.write('display_skipped_hosts = False\n')
+            #f.write('display_skipped_hosts = False\n')
     except IOError:
         log_err('Failed to open ansible.cfg file')
 
@@ -513,6 +524,8 @@ def main():
             f.writelines(node_array)
             f.write('\n[firstnode]\n')
             f.write(first_node)
+            f.write('\n[firstrsnode]\n')
+            f.write(first_rsnode)
     except IOError:
         log_err('Failed to open hosts file')
 
@@ -530,6 +543,7 @@ def main():
 
     if options.verbose: cmd += ' -v'
     if options.user: cmd += ' -u %s' % options.user
+    if options.fork: cmd += ' -f %s' % options.fork
 
     rc = os.system(cmd)
     if rc: log_err('Failed to install EsgynDB by ansible, please check log for details.\n\
@@ -543,7 +557,6 @@ Double check config file \'%s\' to make sure nothing is wrong.' % config_file)
     # rename default config file when successfully installed
     # so next time user can input new variables for a new install
     # or specify the backup config file to install again
-    ts = time.strftime('%y%m%d_%H%M')
     try:
         # only rename default config file
         if config_file == def_cfgfile:

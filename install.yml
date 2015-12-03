@@ -5,6 +5,7 @@
   - traf_check
   - traf_rpm
   - traf_setup
+  tags: setup
 
 - hosts:
   - localhost
@@ -13,13 +14,19 @@
   tags: mod
 
 - hosts:
-  - firstnode
+  - firstrsnode
   roles:
   - hdfs_cmds
-  - traf_start
+  tags: hdfs
 
 - hosts:
   - firstnode
   roles:
   - traf_security
   tags: ldap
+
+- hosts:
+  - firstnode
+  roles:
+  - traf_start
+  tags: start

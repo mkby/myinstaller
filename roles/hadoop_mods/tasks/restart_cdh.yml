@@ -14,6 +14,6 @@
        password={{ mgr_pwd }}
   register: restart_status
   until: restart_status.json.active==False and restart_status.json.success==True
-  retries: 30
-  delay: 20
+  retries: 40
+  delay: 15
 

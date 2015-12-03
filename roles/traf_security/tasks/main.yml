@@ -1,12 +1,7 @@
 ---
 # run on firstnode
-- name: Get SQROOT var
-  shell: "rpm -ql {{ rpm_basename }} |head -1"
-  register: sq_root
-  when: ldap_security == 'Y'
-    
 - name: Generate LDAP config file
-  template: src=traf_authentication_conf.j2 dest={{ sq_root.stdout }}/sql/scripts/traf_authentication_config
+  template: src=traf_authentication_conf.j2 dest={{ sq_root }}/sql/scripts/traf_authentication_config
   sudo_user: trafodion
   sudo: yes
   when: ldap_security == 'Y'
