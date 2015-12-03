@@ -202,7 +202,7 @@ class UserInput:
             },
             'node_list':
             {
-                'prompt':'Enter list of Nodes separated by space, support simple numeric RE, e.g. n0[1-5].com'
+                'prompt':'Enter list of Nodes separated by space, support simple numeric RE,\n e.g. \'n[01-12] n[21-25]\',\'n0[1-5].com\''
             },
             'use_hbase_node':
             {
@@ -282,18 +282,22 @@ class UserInput:
 def expNumRe(text):
     """
     expand numeric regular expression to list
-    e.g. 'n0[1-3] n1[0-1]': [n01,n02,n03,n10,n11]
+    e.g. 'n[01-03] n1[0-1]': ['n01','n02','n03','n10','n11']
+    e.g. 'n[09-11].com': ['n09.com','n10.com','n11.com']
     """
     explist = []
     for regex in text.split():
-        r = re.match(r'(.*)\[(\d)-(\d)\](.*)',regex)
+        r = re.match(r'(.*)\[(\d+)-(\d+)\](.*)',regex)
         if r:
             h = r.group(1)
-            d1 = int(r.group(2))
-            d2 = int(r.group(3))
+            d1 = r.group(2)
+            d2 = r.group(3)
             t = r.group(4)
+
+            convert = lambda d: str(('%0' + str(min(len(d1), len(d2))) + 'd') % d)
             if d1 > d2: d1,d2 = d2,d1
-            explist.extend([h + str(c) + t for c in range(d1, d2+1)])
+            explist.extend([h + convert(c) + t for c in range(int(d1), int(d2)+1)])
+
         else:
             # keep original value if not matched
             explist.append(regex)
@@ -351,7 +355,7 @@ def user_input():
         print ' === NODE LIST ===\n' + node_list
         confirm = u.getinput('confirm', '')
         if confirm == 'N': 
-            log_err('\nAborted...')
+            log_err('Incorrect node list, aborted...')
         else:
             cfgs['node_list'] = ' ' + node_list
 
@@ -507,11 +511,12 @@ def main():
     ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
     hosts_file = installer_loc + '/hosts'
     ts = time.strftime('%y%m%d_%H%M')
+    log_path = '%s/esgyndb_install_%s.log' %(installer_loc, ts)
 
     try:
         with open(ansible_cfg, 'w') as f:
             f.write('[defaults]\n')
-            f.write('log_path = $HOME/esgyndb_install_' + ts + '.log\n')
+            f.write('log_path = %s\n' % log_path)
             f.write('inventory =' + hosts_file + '\n')
             f.write('host_key_checking = False\n')
             #f.write('display_skipped_hosts = False\n')
@@ -546,8 +551,8 @@ def main():
     if options.fork: cmd += ' -f %s' % options.fork
 
     rc = os.system(cmd)
-    if rc: log_err('Failed to install EsgynDB by ansible, please check log for details.\n\
-Double check config file \'%s\' to make sure nothing is wrong.' % config_file)
+    if rc: log_err('Failed to install EsgynDB by ansible, please check log file %s for details.\n\
+Double check config file \'%s\' to make sure nothing is wrong.' % (log_path, config_file))
 
     format_output('EsgynDB Installation Complete')
 
