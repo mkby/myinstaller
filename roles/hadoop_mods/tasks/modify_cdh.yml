@@ -1,6 +1,6 @@
 # modify Cloudera services config
 - name: Change HDFS config using Cloudera REST api
-  uri: url=http://{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hdfs/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hdfs/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
@@ -9,7 +9,7 @@
   register: hdfs_config_result
 
 - name: Change HBase config using Cloudera REST api
-  uri: url=http://{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hbase/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hbase/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
@@ -18,7 +18,7 @@
   register: hbase_config_result
 
 - name: Change ZooKeeper config using Cloudera REST api
-  uri: url=http://{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/zookeeper/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/zookeeper/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}

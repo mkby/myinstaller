@@ -1,6 +1,6 @@
 # restart Hadoop services
 - name: Restarting Hadoop
-  uri: url=http://{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/commands/restart
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/commands/restart
        method=POST
        user={{ mgr_user }}
        password={{ mgr_pwd }}
@@ -8,7 +8,7 @@
   tags: restart_hadoop
 
 - name: "Check restart status until successful (timeout: 10mins)"
-  uri: url=http://{{ mgr_url }}/api/v1/commands/{{ restart_cmd.json.id }}
+  uri: url={{ mgr_url }}/api/v1/commands/{{ restart_cmd.json.id }}
        method=GET
        user={{ mgr_user }}
        password={{ mgr_pwd }}
