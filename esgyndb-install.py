@@ -341,14 +341,14 @@ def user_input():
     else:
         g('traf_rpm')
 
-    if ('http:' or 'https:') in g('mgr_url'): 
-        log_err('Do not include http or https')
+    if not ('http:' or 'https:') in g('mgr_url'): cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
+
     g('mgr_user')
     g('mgr_pwd')
 
     # validate url
     hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
-    hg.get_content('http://' + cfgs['mgr_url'], test=True)
+    hg.get_content(cfgs['mgr_url'], test=True)
 
     if  g('use_hbase_node') == 'N':
         node_list = ' '.join(expNumRe(g('node_list')))

@@ -1,0 +1,115 @@
+---
+- set_fact:
+    dbmgr_rpmloc: '/home/centos/esgyndb-installer/esgynDB-manager-2.0.1-1.x86_64.rpm'
+    dbmgr_rpm: 'esgynDB-manager-2.0.1-1.x86_64.rpm'
+
+- name: Copy esgynDB manager RPM to all nodes
+  copy: src={{ dbmgr_rpmloc }} dest=/tmp/ force=yes
+
+- name: Install esgynDB manager RPM
+  yum: name="/tmp/{{ dbmgr_rpm }}" state=present
+  sudo: yes
+
+- name: Get esgynDB manager RPM install location
+  shell: "rpm -ql esgynDB-manager|head -1"
+  register: dbmgr_loc
+
+- name: Get RPM version
+  shell: "echo {{ dbmgr_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
+  register: dbmgr_version
+  when: dbmgr_loc|success
+
+- set_fact:
+    mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
+    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
+    hbase_xml_file: "/etc/hbase/conf/hbase-site.xml"
+    dcs_master_host: "eason-2"
+# This script will use hbase shell, so it should be better to run on regionserver node
+# But esgyndb manager will be installed on the same node as Trafodion, so we have to run it on first trafodion node
+- name: Create OpenTSDB tables
+  shell: "export HBASE_HOME=/usr; export COMPRESSION=NONE; {{ mgblty_install_dir }}/opentsdb/tools/create_table.sh"
+  sudo_user: trafodion
+  sudo: yes
+  when: inventory_hostname in groups['firstnode']
+
+- name: Check ports
+  script: check_ports.py
+  register: ports
+
+- set_fact:
+    rest_port: "{{ ports.stdout_lines[0] }}"
+    dm_http_port: "{{ ports.stdout_lines[1] }}"
+    dm_https_port: "{{ ports.stdout_lines[2] }}"
+    tsd_port: "{{ ports.stdout_lines[3] }}"
+    http_port: "{{ ports.stdout_lines[4] }}"
+    dcs_port: 23400
+    dcs_info_port: 24400
+
+- name: Edit bosun.conf for http port
+  replace: dest={{ mgblty_install_dir }}/bosun/conf/bosun.conf
+           regexp='localhost:5242'
+           replace="{{ dcs_master_host }}:{{ tsd_port }}"
+  sudo: yes
+  sudo_user: trafodion
+
+- name: Edit opentsdb.conf for tsd port
+  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+           regexp='tsd.network.port = .*'
+           replace="tsd.network.port = {{ tsd_port }}"
+  sudo_user: trafodion
+  sudo: yes
+
+- name: Registering Metrics
+  shell: "{{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
+  sudo: yes
+
+- name: Edit tcollector startstop
+  replace: dest={{ mgblty_install_dir }}/tcollector/startstop
+           regexp='5242' replace={{ tsd_port }}
+  sudo_user: trafodion
+  sudo: yes
+
+- name: Edit tcollector trafcanqry
+  replace: dest={{ mgblty_install_dir }}/tcollector/collectors/300/trafcanqry.py
+           regexp='DCS_MASTER_HOST:DCS_PORT' replace="{{ dcs_master_host }}:{{ dcs_port }}"
+  sudo_user: trafodion
+  sudo: yes
+
+- name: Get zookeeper quorum
+  shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
+  register: zookeeper_quorum
+
+- set_fact:
+    zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
+
+- name: Edit opentsdb.conf for zookeeper nodes
+  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+           regexp='localhost:2181'
+           replace="{{ ','.join(zkhosts.split()) }}"
+  sudo_user: trafodion
+  sudo: yes
+
+- name: Edit openTSDB logback.xml
+  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/logback.xml
+           regexp='/var/log/opentsdb' replace='../../log'
+  sudo_user: trafodion
+  sudo: yes
+
+- name: Get timezone
+  script: gettimezone.sh
+  register: tz
+
+- name: Configure esgynDB manager
+  shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ dcs_master_host }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ dcs_master_host }} --restport {{ rest_port }} --tsdhost {{ dcs_master_host }} --tsdport {{ tsd_port }} --bosunhost {{ dcs_master_host }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }}"
+  sudo: yes
+  sudo_user: trafodion
+
+- name: Export mgblty install dir to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}"
+  sudo: yes
+
+- name: Export dbmgr install dir to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export DBMGR_INSTALL_DIR={{ dbmgr_install_dir }}"
+  sudo: yes
