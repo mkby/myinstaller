@@ -3,6 +3,7 @@
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/commands/restart
        method=POST
        user={{ mgr_user }}
+       validate_certs=no
        password={{ mgr_pwd }}
   register: restart_cmd
   tags: restart_hadoop
@@ -12,6 +13,7 @@
        method=GET
        user={{ mgr_user }}
        password={{ mgr_pwd }}
+       validate_certs=no
   register: restart_status
   until: restart_status.json.active==False and restart_status.json.success==True
   retries: 40

@@ -7,6 +7,12 @@
   - traf_setup
   tags: setup
 
+- hosts: 
+  - trafnodes
+  roles:
+  - dbmgr_setup
+  tags: dbmgr
+
 - hosts:
   - localhost
   roles:

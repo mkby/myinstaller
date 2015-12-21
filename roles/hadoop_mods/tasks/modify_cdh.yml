@@ -5,6 +5,7 @@
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
        password={{ mgr_pwd }}
+       validate_certs=no
        body="{{ lookup('file','hdfs_config.json') }}"
   register: hdfs_config_result
 
@@ -14,6 +15,7 @@
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
        password={{ mgr_pwd }}
+       validate_certs=no
        body="{{ lookup('file','hbase_config.json') }}"
   register: hbase_config_result
 
@@ -23,5 +25,6 @@
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
        password={{ mgr_pwd }}
+       validate_certs=no
        body="{{ lookup('file','zookeeper_config.json') }}"
   register: zookeeper_config_result

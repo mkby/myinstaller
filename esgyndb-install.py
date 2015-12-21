@@ -200,6 +200,11 @@ class UserInput:
                 'prompt':'Enter full path to Trafodion RPM file',
                 'isexist': True
             },
+            'dbmgr_rpm':
+            {
+                'prompt':'Enter full path to esgynDB manager RPM file',
+                'isexist': True
+            },
             'node_list':
             {
                 'prompt':'Enter list of Nodes separated by space, support simple numeric RE,\n e.g. \'n[01-12] n[21-25]\',\'n0[1-5].com\''
@@ -321,7 +326,7 @@ def format_output(text):
     print '  ' + text
     print '*' * num
 
-def user_input():
+def user_input(skip_dbmgr=False):
     """ get user's input and check input value """
     global cfgs, tmp_file, installer_loc
     # load from temp storaged config file
@@ -340,6 +345,15 @@ def user_input():
         u.getinput('traf_rpm', def_rpm[0])
     else:
         g('traf_rpm')
+
+    if not skip_dbmgr:
+        # find esgyndb manager rpm in installer folder, if more than one
+        # rpm found, use the first one
+        dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
+        if dbmgr_rpm:
+            u.getinput('dbmgr_rpm', dbmgr_rpm[0])
+        else:
+            g('dbmgr_rpm')
 
     if not ('http:' or 'https:') in g('mgr_url'): cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
 
@@ -445,7 +459,9 @@ def main():
 
     # not specified config file and default config file doesn't exist either
     if not os.path.exists(config_file): 
-        user_input()
+        # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
+        skip_dbmgr = False
+        user_input(skip_dbmgr)
         
         hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
 
@@ -542,6 +558,7 @@ def main():
     cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
         (installer_loc, installer_loc, json.dumps(cfgs))
 
+    if skip_dbmgr: cmd += ' --skip-tags=dbmgr'
     if not options.dispass: 
         cmd += ' -k'
         print 'Input remote hosts SSH passwd:\n'
