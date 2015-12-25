@@ -10,7 +10,7 @@ try:
 except ImportError:
     print 'Python module httplib2 is not found. Install python-httplib2 or ansible first.'
     sys.exit(1)
-
+import base64
 import getpass
 import time
 from optparse import OptionParser
@@ -63,7 +63,7 @@ class HttpGet:
     def __init__(self, user, passwd):
         self.user = user
         self.passwd = passwd
-        self.h = httplib2.Http(".cache")  
+        self.h = httplib2.Http(disable_ssl_certificate_validation=True)  
         self.h.add_credentials(self.user, self.passwd)
 
     def get_content(self, url, test=False):
@@ -160,7 +160,6 @@ class UserInput:
             'ldap_pwd':
             {
                 'prompt':'Enter Search password (if required)',
-                'default':'None',
                 'ispasswd':True
             },
             'java_home':
@@ -186,13 +185,11 @@ class UserInput:
             'mgr_pwd':
             {
                 'prompt':'Enter HDP/CDH web manager user password',
-                'default':'admin',
                 'ispasswd':True
             },
             'traf_pwd':
             {
                 'prompt':'Enter trafodion password',
-                'default':'traf123',
                 'ispasswd':True
             },
             'traf_rpm':
@@ -229,7 +226,10 @@ class UserInput:
         default = userdef
         ispasswd = isYN = isdigit = isexist = ''
         if (not default) and args.has_key('default'): default = args['default']
-        if args.has_key('ispasswd'): ispasswd = args['ispasswd']
+        if args.has_key('ispasswd'): 
+            ispasswd = args['ispasswd']
+            # no default value for password
+            default = ''
         if args.has_key('isYN'): isYN = args['isYN']
         if args.has_key('isdigit'): isdigit = args['isdigit']
         if args.has_key('isexist'): isexist = args['isexist']
@@ -242,16 +242,9 @@ class UserInput:
         else:
             prompt = prompt + ': '
     
+        # no default value for password
         if ispasswd:
-            orig = getpass.getpass(prompt)
-            if (not orig) and default: 
-                answer = default
-            else:
-                confirm = getpass.getpass('Confirm ' + prompt)
-                if orig == confirm: 
-                    answer = confirm
-                else:
-                    log_err('Password mismatch')
+            answer = base64.b64encode(getpass.getpass(prompt))
         else:
             answer = raw_input(prompt)
             if not answer and default: answer = default
@@ -355,7 +348,9 @@ def user_input(skip_dbmgr=False):
         else:
             g('dbmgr_rpm')
 
-    if not ('http:' or 'https:') in g('mgr_url'): cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
+    url = g('mgr_url')
+    if not ('http:' in url or 'https:' in url): 
+        cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
 
     g('mgr_user')
     g('mgr_pwd')
@@ -429,12 +424,14 @@ def main():
     parser.add_option("-c", "--config-file", dest="cfgfile", metavar="FILE",
                 help="Json format file. If provided, all install prompts \
                       will be taken from this file and not prompted for.")
+    parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
+                help="Install esgynDB manager only, be sure esgynDB is previously installed.")
     parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
                 help="Specify ssh login user for remote server, \
                       if not provided, use current login user as default.")
     parser.add_option("-f", "--fork", dest="fork", metavar="FORK",
                 help="Specify number of parallel processes to use for ansible(default=5)" )
-    parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=True,
+    parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=False,
                 help="Do not prompt SSH login password for remote hosts. \
                       If set, be sure passwordless ssh is configured.")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
@@ -457,15 +454,15 @@ def main():
 
     p = ParseJson(config_file)
 
+    # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
+    skip_dbmgr = False
     # not specified config file and default config file doesn't exist either
     if not os.path.exists(config_file): 
-        # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-        skip_dbmgr = False
         user_input(skip_dbmgr)
         
-        hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
+        hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
 
-        cm = hg.get_content('http://%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+        cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
         # get cluster info, assume only one cluster being managed
         cluster_name = cm['clusters'][0]['displayName']
         cluster_version = cm['clusters'][0]['version']

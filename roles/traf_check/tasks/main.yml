@@ -1,9 +1,9 @@
 - name: Check nodes connectivity
   ping: 
 
-- name: Check sudo access
+- name: Check become method access
   command: "echo"
-  sudo: yes
+  become: yes
 
 #- name: Check HBase version
 
@@ -26,20 +26,20 @@
   # force rc=0, don't let it fail
   shell: "rpm -qa|grep -c {{ rpm_basename }}; echo -n"
   register: trafinstalled
-  sudo: yes
+  become: yes
 
 - name: Check if Trafodion is running
   shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'; echo -n"
   register: trafstat
   when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1'
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
 - name: Stop Trafodion if it's running
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
   when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and trafstat.stdout=='1'
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
 - set_fact:
     traf_init: "Y"

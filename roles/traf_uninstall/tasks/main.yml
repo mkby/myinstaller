@@ -6,20 +6,20 @@
   
 - name: Stop trafodion processes if exist
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall; sleep 5"
-  sudo: yes
-  sudo_user: trafodion
+  become: yes
+  become_user: trafodion
   ignore_errors: true
   when: inventory_hostname in groups['firstnode'] and trafuser.stat.exists==True
 
 - name: Uninstall trafodion RPM
   yum: name=trafodion state=absent
-  sudo: yes
+  become: yes
 
 - name: Remove trafodion RPM and user home directory
   shell: "rm /home/trafodion /tmp/trafodion*.rpm -rf"
-  sudo: yes
+  become: yes
 
 - name: Delete trafodion user
   user: name=trafodion state=absent remove=yes
-  sudo: yes
+  become: yes
 

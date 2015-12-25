@@ -14,7 +14,7 @@
 
 - name: Install esgynDB manager RPM
   yum: name="/tmp/{{ dbmgr_rpmname }}" state=present
-  sudo: yes
+  become: yes
 
 - name: Get esgynDB manager RPM install location
   shell: "rpm -ql esgynDB-manager|head -1"
@@ -29,13 +29,18 @@
     mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
     dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
     hbase_xml_file: "/etc/hbase/conf/hbase-site.xml"
-    dcs_master_host: "eason-2"
+    dcs_master_host: "{{ groups['firstnode'][0] }}"
+
+- set_fact:
+    dcs_master_host: "{{ dcs_ip }}"
+  when: dcs_ip!=''
+
 # This script will use hbase shell, so it should be better to run on regionserver node
 # But esgyndb manager will be installed on the same node as Trafodion, so we have to run it on first trafodion node
 - name: Create OpenTSDB tables
-  shell: "export HBASE_HOME=/usr; export COMPRESSION=NONE; {{ mgblty_install_dir }}/opentsdb/tools/create_table.sh"
-  sudo_user: trafodion
-  sudo: yes
+  shell: "export HBASE_HOME=/usr; export COMPRESSION=GZ; {{ mgblty_install_dir }}/opentsdb/tools/create_table.sh"
+  become_user: trafodion
+  become: yes
   when: inventory_hostname in groups['firstnode']
 
 - name: Check ports
@@ -55,33 +60,45 @@
   replace: dest={{ mgblty_install_dir }}/bosun/conf/bosun.conf
            regexp='tsdbHost = .*'
            replace="tsdbHost = {{ dcs_master_host }}:{{ tsd_port }}"
-  sudo: yes
-  sudo_user: trafodion
+  become: yes
+  become_user: trafodion
 
 - name: Edit opentsdb.conf for tsd port
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
            regexp='tsd.network.port = .*'
            replace="tsd.network.port = {{ tsd_port }}"
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
+
+- name: Get timezone
+  script: gettimezone.sh
+  register: tz
+
+- name: Edit opentsdb.conf for time zone
+  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+           regexp='tsd.core.timezone = .*'
+           replace="tsd.core.timezone = {{ tz.stdout_lines[0] }}"
+  become_user: trafodion
+  become: yes
 
 - name: Registering Metrics
-  shell: "{{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
-  sudo_user: trafodion
-  sudo: yes
+  shell: "export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}; {{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
+  become_user: trafodion
+  become: yes
+  when: inventory_hostname in groups['firstnode']
 
 - name: Edit tcollector startstop
   replace: dest={{ mgblty_install_dir }}/tcollector/startstop
            regexp='TSDPORT=.*'
            replace="TSDPORT={{ tsd_port }}"
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
 - name: Edit tcollector trafcanqry
   replace: dest={{ mgblty_install_dir }}/tcollector/collectors/300/trafcanqry.py
            regexp='DCS_MASTER_HOST:DCS_PORT' replace="{{ dcs_master_host }}:{{ dcs_port }}"
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
 - name: Get zookeeper quorum
   shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
@@ -94,35 +111,32 @@
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
            regexp='tsd.storage.hbase.zk_quorum = .*'
            replace="tsd.storage.hbase.zk_quorum = {{ ','.join(zkhosts.split()) }}"
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
 - name: Edit openTSDB logback.xml
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/logback.xml
            regexp='/var/log/opentsdb' replace='../../log'
-  sudo_user: trafodion
-  sudo: yes
+  become_user: trafodion
+  become: yes
 
-- name: Get timezone
-  script: gettimezone.sh
-  register: tz
 
 - name: Configure esgynDB manager
   shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }}"
-  sudo: yes
-  sudo_user: trafodion
+  become: yes
+  become_user: trafodion
+
+- name: Export jython path to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export PATH=$PATH:{{ mgblty_install_dir }}/jython2.7.0/bin"
+  become: yes
 
 - name: Export mgblty install dir to bashrc
   lineinfile: dest=/home/trafodion/.bashrc
               line="export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}"
-  sudo: yes
-
-- name: Export mgblty install dir to bashrc
-  lineinfile: dest=/home/trafodion/.bashrc
-              line="export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}"
-  sudo: yes
+  become: yes
 
 - name: Export dbmgr install dir to bashrc
   lineinfile: dest=/home/trafodion/.bashrc
               line="export DBMGR_INSTALL_DIR={{ dbmgr_install_dir }}"
-  sudo: yes
+  become: yes

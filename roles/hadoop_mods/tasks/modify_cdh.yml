@@ -4,27 +4,59 @@
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
-       password={{ mgr_pwd }}
+       password={{ mgrpwd }}
        validate_certs=no
        body="{{ lookup('file','hdfs_config.json') }}"
   register: hdfs_config_result
 
-- name: Change HBase config using Cloudera REST api
+- name: Change HBase master config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hbase/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
-       password={{ mgr_pwd }}
+       password={{ mgrpwd }}
        validate_certs=no
-       body="{{ lookup('file','hbase_config.json') }}"
-  register: hbase_config_result
+       body="{{ lookup('file','hbase_master_config.json') }}"
+  register: hbase_master_config_result
+
+- set_fact:
+    rs_grpurl: "{{ mgr_url }}/api/v6/clusters/{{ cluster_name }}/services/hbase/roleConfigGroups"
+
+- name: Get Hbase role config groups
+  uri: url={{ rs_grpurl }}
+       method=GET
+       user={{ mgr_user }}
+       password={{ mgrpwd }}
+       validate_certs=no
+  register: rcg
+
+# get all region server groups
+- set_fact:
+    rs_grpname:  "{% for i in rcg.json['items'] %} 
+                    {% if i.roleType=='REGIONSERVER' %}  {{ i.name }} {% endif %}
+                  {% endfor %}"
+
+- set_fact:
+    rs_grplist: "{{ rs_grpname.split() }}"
+
+# modify configs on all regionserver groups
+- name: Change HBase regionserver config using Cloudera REST api
+  uri: url={{ rs_grpurl }}/{{ item }}/config
+       method=PUT
+       HEADER_Content-Type="application/json"
+       user={{ mgr_user }}
+       password={{ mgrpwd }}
+       validate_certs=no
+       body="{{ lookup('file','hbase_rs_config.json') }}"
+  with_items: rs_grplist
+  register: hbase_rs_config_result
 
 - name: Change ZooKeeper config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/zookeeper/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
-       password={{ mgr_pwd }}
+       password={{ mgrpwd }}
        validate_certs=no
        body="{{ lookup('file','zookeeper_config.json') }}"
   register: zookeeper_config_result

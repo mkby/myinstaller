@@ -14,15 +14,11 @@ def check_port(port):
         if not rc: port += 10
     print port
 
-rest_port = 4200
 dm_http_port = 4205
 dm_https_port = 4206
 tsd_port = 5242
 http_port = 8070
-dcs_port = 23400
-dcs_info_port = 24400
 
-check_port(rest_port)
 check_port(dm_http_port)
 check_port(dm_https_port)
 check_port(tsd_port)
