@@ -3,6 +3,7 @@
 import sys
 import os
 import re
+import socket
 import json
 # httplib2 is not installed by default
 try:
@@ -15,23 +16,11 @@ import getpass
 import time
 from optparse import OptionParser
 from glob import glob
+from collections import defaultdict
 
 # init global cfgs for user input
-cfgs = {
-'traf_rpm':        '', 'mgr_url':         '',  
-'mgr_user':        '', 'mgr_pwd':         '',  
-'java_home':       '', 'use_hbase_node':  '',  
-'node_list':       '', 'traf_start':      '',  
-'traf_pwd':        '', 'hdfs_user':       '',  
-'hbase_user':      '', 'hbase_group':     '',  
-'dcs_cnt_per_node':'', 'dcs_ha':          '',  
-'ldap_security':   '', 'dcs_ip':          '',
-'dcs_interface':   '', 'dcs_bknodes':     '',
-'ldap_security':   '', 'ldap_hosts':      '',
-'ldap_port':       '', 'ldap_identifiers':'',
-'ldap_encrypt':    '', 'ldap_certpath':   '',
-'ldap_user':       '', 'ldap_pwd':        '',
-}
+cfgs = defaultdict(str)
+
 tmp_file = '/tmp/esgyndb_config_temp'
 installer_loc = sys.path[0]
 
@@ -113,6 +102,7 @@ class UserInput:
             'dcs_ip':
             {
                 'prompt':'Enter Floating IP address for DCS HA',
+                'isIP':True
             },
             'dcs_interface':
             {
@@ -224,7 +214,7 @@ class UserInput:
     def _handle_input(self, args, userdef):
         prompt = args['prompt']
         default = userdef
-        ispasswd = isYN = isdigit = isexist = ''
+        ispasswd = isYN = isdigit = isexist = isIP = ''
         if (not default) and args.has_key('default'): default = args['default']
         if args.has_key('ispasswd'): 
             ispasswd = args['ispasswd']
@@ -233,6 +223,7 @@ class UserInput:
         if args.has_key('isYN'): isYN = args['isYN']
         if args.has_key('isdigit'): isdigit = args['isdigit']
         if args.has_key('isexist'): isexist = args['isexist']
+        if args.has_key('isIP'): isIP = args['isIP']
     
         if isYN:
             prompt = prompt + ' (Y/N) '
@@ -262,6 +253,12 @@ class UserInput:
             elif isexist:
                 if not os.path.exists(answer):
                     log_err('\'%s\' doesn\'t exist' % answer)
+            elif isIP:
+                try:
+                    socket.inet_pton(socket.AF_INET, answer)
+                except:
+                    log_err('Invalid IP address \'%s\'' % answer)
+
         else:
             log_err('Empty value')
         
@@ -319,6 +316,16 @@ def format_output(text):
     print '  ' + text
     print '*' * num
 
+def check_node_conn():
+    for node in cfgs['node_list'].split():
+        rc = os.system('ping -c 1 %s >/dev/null 2>&1' % node)
+        if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
+
+def check_mgr_url():
+    # validate url, will not validate user/passwd here
+    hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
+    hg.get_content(cfgs['mgr_url'], test=True)
+
 def user_input(skip_dbmgr=False):
     """ get user's input and check input value """
     global cfgs, tmp_file, installer_loc
@@ -355,9 +362,7 @@ def user_input(skip_dbmgr=False):
     g('mgr_user')
     g('mgr_pwd')
 
-    # validate url
-    hg = HttpGet(cfgs['mgr_user'], cfgs['mgr_pwd'])
-    hg.get_content(cfgs['mgr_url'], test=True)
+    check_mgr_url()
 
     if  g('use_hbase_node') == 'N':
         node_list = ' '.join(expNumRe(g('node_list')))
@@ -368,9 +373,7 @@ def user_input(skip_dbmgr=False):
         else:
             cfgs['node_list'] = ' ' + node_list
 
-        for node in node_list.split():
-            rc = os.system('ping -c 1 %s >/dev/null 2>&1' % node)
-            if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
+        check_node_conn()
     
     g('traf_pwd')
     g('traf_start')
@@ -400,6 +403,7 @@ def user_input(skip_dbmgr=False):
         g('dcs_ip')
         g('dcs_interface')
         g('dcs_bknodes')
+
 
 def pre_check():
     """ check required packages should be installed """
@@ -508,7 +512,11 @@ def main():
 
     # config file exists
     else:
-        print '\n** Loading configs from json file ... \n'
+        # check some basic info
+        check_mgr_url()
+        check_node_conn()
+
+        print '\n** L ading configs from json file ... \n'
         cfgs = p.jload()
 
 
