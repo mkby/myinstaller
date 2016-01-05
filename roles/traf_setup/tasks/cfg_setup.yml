@@ -42,7 +42,10 @@
     dcs_bkmaster_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
     dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
     rest_site_file: "{{ sq_root }}/rest-{{ traf_ver }}/conf/rest-site.xml"
+
+- set_fact:
     dcs_backup_nodes: "{{ dcs_bknodes.split() }}"
+  when: dcs_bknodes is defined
 
 - name: Generate dcs-site.xml
   template: src=dcs-site.xml.j2 dest={{ dcs_site_file }}

@@ -40,7 +40,7 @@ class ParseJson:
             content += t
 
         try:
-            return json.loads(content)
+            return defaultdict(str, json.loads(content))
         except ValueError:
             log_err('No json format found in config file')
 
@@ -64,7 +64,7 @@ class HttpGet:
 
         if not test:
             try:
-                return json.loads(content)
+                return defaultdict(str, json.loads(content))
             except ValueError:
                 log_err('No json format found in http content')
             
@@ -81,12 +81,14 @@ class UserInput:
             'hdfs_user':
             {
                 'prompt':'Enter hdfs user name',
-                'default':'hdfs'
+                'default':'hdfs',
+                'isuser': True
             },
             'hbase_user':
             {
                 'prompt':'Enter hbase user name',
-                'default':'hbase'
+                'default':'hbase',
+                'isuser': True
             },
             'hbase_group':
             {
@@ -146,6 +148,7 @@ class UserInput:
             {
                 'prompt':'Enter Search user name (if required)',
                 'default':'None',
+                'isuser': True
             },
             'ldap_pwd':
             {
@@ -154,7 +157,7 @@ class UserInput:
             },
             'java_home':
             {
-                'prompt':'Specify location of Java 1.7.0_65 or higher (JDK)',
+                'prompt':'Specify location of Java 1.7.0_65 or higher (JDK) on trafodion nodes',
                 'default':'/usr/java/jdk1.7.0_67-cloudera'
             },
             'dcs_cnt_per_node':
@@ -165,12 +168,13 @@ class UserInput:
             },
             'mgr_url':
             {
-                'prompt':'Enter HDP/CDH web manager URL:port, (no http:// needed)'
+                'prompt':'Enter HDP/CDH web manager URL:port, (full URL, if no http/https prefix, default prefix is http://)'
             },
             'mgr_user':
             {
                 'prompt':'Enter HDP/CDH web manager user name',
-                'default':'admin'
+                'default':'admin',
+                'isuser': True
             },
             'mgr_pwd':
             {
@@ -214,7 +218,7 @@ class UserInput:
     def _handle_input(self, args, userdef):
         prompt = args['prompt']
         default = userdef
-        ispasswd = isYN = isdigit = isexist = isIP = ''
+        ispasswd = isYN = isdigit = isexist = isIP = isuser = ''
         if (not default) and args.has_key('default'): default = args['default']
         if args.has_key('ispasswd'): 
             ispasswd = args['ispasswd']
@@ -224,6 +228,7 @@ class UserInput:
         if args.has_key('isdigit'): isdigit = args['isdigit']
         if args.has_key('isexist'): isexist = args['isexist']
         if args.has_key('isIP'): isIP = args['isIP']
+        if args.has_key('isuser'): isuser = args['isuser']
     
         if isYN:
             prompt = prompt + ' (Y/N) '
@@ -258,6 +263,9 @@ class UserInput:
                     socket.inet_pton(socket.AF_INET, answer)
                 except:
                     log_err('Invalid IP address \'%s\'' % answer)
+            elif isuser:
+                if re.match(r'\w+', answer).group() != answer:
+                    log_err('Invalid user name \'%s\'' % answer)
 
         else:
             log_err('Empty value')
@@ -326,7 +334,7 @@ def check_mgr_url():
     hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
     hg.get_content(cfgs['mgr_url'], test=True)
 
-def user_input(skip_dbmgr=False):
+def user_input(no_dbmgr=False):
     """ get user's input and check input value """
     global cfgs, tmp_file, installer_loc
     # load from temp storaged config file
@@ -346,7 +354,7 @@ def user_input(skip_dbmgr=False):
     else:
         g('traf_rpm')
 
-    if not skip_dbmgr:
+    if not no_dbmgr:
         # find esgyndb manager rpm in installer folder, if more than one
         # rpm found, use the first one
         dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
@@ -428,8 +436,6 @@ def main():
     parser.add_option("-c", "--config-file", dest="cfgfile", metavar="FILE",
                 help="Json format file. If provided, all install prompts \
                       will be taken from this file and not prompted for.")
-    parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
-                help="Install esgynDB manager only, be sure esgynDB is previously installed.")
     parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
                 help="Specify ssh login user for remote server, \
                       if not provided, use current login user as default.")
@@ -440,8 +446,18 @@ def main():
                       If set, be sure passwordless ssh is configured.")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
                 help="Verbose mode for ansible.")
+    parser.add_option("--dry-run", action="store_true", dest="dryrun", default=False,
+                help="Dry run mode, it will only generate the config file.") 
+    parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
+                help="Install esgynDB manager only, be sure esgynDB is previously installed.")
+    parser.add_option("--dbmgr-rpm", dest="dbmgrrpm", metavar="RPMFILE",
+                help="Specify esgynDB manager RPM location.")
 
     (options, args) = parser.parse_args()
+
+    # handle parser option
+    if options.dbmgr and not options.dbmgrrpm: log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
+    if not options.dbmgr and options.dbmgrrpm: log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
 
     #######################################
     # get user input and gen variable file
@@ -459,10 +475,16 @@ def main():
     p = ParseJson(config_file)
 
     # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    skip_dbmgr = False
+    no_dbmgr = False
+
+    # must install Trafodion first if using dbmgr only mode
+    if options.dbmgr and not os.path.exists(config_file):
+        log_err('Must specify the config file, which means you have previously installed Trafodion')
+
     # not specified config file and default config file doesn't exist either
-    if not os.path.exists(config_file): 
-        user_input(skip_dbmgr)
+    if options.dryrun or (not os.path.exists(config_file)): 
+        if options.dryrun: format_output('DryRun Start')
+        user_input(no_dbmgr)
         
         hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
 
@@ -505,6 +527,7 @@ def main():
 
         cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
         cfgs['rpm_basename'] = 'trafodion'
+        cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
 
         # save config file as json format
         print '\n** Generating json file to save configs ... \n'
@@ -512,88 +535,101 @@ def main():
 
     # config file exists
     else:
+        print '\n** Loading configs from json file ... \n'
+        cfgs = p.jload()
+
         # check some basic info
         check_mgr_url()
         check_node_conn()
 
-        print '\n** L ading configs from json file ... \n'
-        cfgs = p.jload()
+    if not options.dryrun:
+        #####################################
+        # generate ansible config&hosts file
+        #####################################
+        print '\n** Generating ansible config and hosts file ... \n'
+        node_array = cfgs['node_list'].split()
+        first_node = node_array[0]
+        first_rsnode = cfgs['first_rsnode']
+        node_array = [ node + '\n' for node in node_array ]
 
+        ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
+        hosts_file = installer_loc + '/hosts'
+        ts = time.strftime('%y%m%d_%H%M')
+        log_path = '%s/esgyndb_install_%s.log' %(installer_loc, ts)
 
-    #####################################
-    # generate ansible config&hosts file
-    #####################################
-    print '\n** Generating ansible config and hosts file ... \n'
-    node_array = cfgs['node_list'].split()
-    first_node = node_array[0]
-    first_rsnode = cfgs['first_rsnode']
-    node_array = [ node + '\n' for node in node_array ]
+        try:
+            with open(ansible_cfg, 'w') as f:
+                f.write('[defaults]\n')
+                f.write('log_path = %s\n' % log_path)
+                f.write('inventory =' + hosts_file + '\n')
+                f.write('host_key_checking = False\n')
+                #f.write('display_skipped_hosts = False\n')
+        except IOError:
+            log_err('Failed to open ansible.cfg file')
 
-    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-    hosts_file = installer_loc + '/hosts'
-    ts = time.strftime('%y%m%d_%H%M')
-    log_path = '%s/esgyndb_install_%s.log' %(installer_loc, ts)
+        try:
+            with open(hosts_file, 'w') as f:
+                f.write('[trafnodes]\n')
+                f.writelines(node_array)
+                f.write('\n[firstnode]\n')
+                f.write(first_node)
+                f.write('\n[firstrsnode]\n')
+                f.write(first_rsnode)
+        except IOError:
+            log_err('Failed to open hosts file')
 
-    try:
-        with open(ansible_cfg, 'w') as f:
-            f.write('[defaults]\n')
-            f.write('log_path = %s\n' % log_path)
-            f.write('inventory =' + hosts_file + '\n')
-            f.write('host_key_checking = False\n')
-            #f.write('display_skipped_hosts = False\n')
-    except IOError:
-        log_err('Failed to open ansible.cfg file')
+        #############################
+        # calling ansible to install
+        #############################
+        format_output('Ansible Installation start')
 
-    try:
-        with open(hosts_file, 'w') as f:
-            f.write('[trafnodes]\n')
-            f.writelines(node_array)
-            f.write('\n[firstnode]\n')
-            f.write(first_node)
-            f.write('\n[firstrsnode]\n')
-            f.write(first_rsnode)
-    except IOError:
-        log_err('Failed to open hosts file')
+        cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
+            (installer_loc, installer_loc, json.dumps(cfgs))
 
-    #############################
-    # calling ansible to install
-    #############################
-    format_output('Ansible Installation start')
+        # only install esgynDB manager
+        if options.dbmgr: 
+            cmd += ' --tags=dbmgr'
+ 
+            # will overwrite previous dbmgr_rpm value
+            if os.path.exists(options.dbmgrrpm):
+                cmd += ' --extra-vars "dbmgr_rpm=%s"' % options.dbmgrrpm
+            else:
+                log_err('Failed to find esgynDB manager rpm file')
 
-    cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
-        (installer_loc, installer_loc, json.dumps(cfgs))
+            # force set to false
+            no_dbmgr = False
 
-    if skip_dbmgr: cmd += ' --skip-tags=dbmgr'
-    if not options.dispass: 
-        cmd += ' -k'
-        print 'Input remote hosts SSH passwd:\n'
+        if no_dbmgr: cmd += ' --skip-tags=dbmgr'
+        if not options.dispass: cmd += ' -k'
+        if options.verbose: cmd += ' -v'
+        if options.user: cmd += ' -u %s' % options.user
+        if options.fork: cmd += ' -f %s' % options.fork
 
-    if options.verbose: cmd += ' -v'
-    if options.user: cmd += ' -u %s' % options.user
-    if options.fork: cmd += ' -f %s' % options.fork
+        rc = os.system(cmd)
+        if rc: log_err('Failed to install EsgynDB by ansible, please check log file %s for details.\n\
+    Double check config file \'%s\' to make sure nothing is wrong.' % (log_path, config_file))
 
-    rc = os.system(cmd)
-    if rc: log_err('Failed to install EsgynDB by ansible, please check log file %s for details.\n\
-Double check config file \'%s\' to make sure nothing is wrong.' % (log_path, config_file))
+        format_output('EsgynDB Installation Complete')
 
-    format_output('EsgynDB Installation Complete')
+        ################
+        # clean up work
+        ################
+        # rename default config file when successfully installed
+        # so next time user can input new variables for a new install
+        # or specify the backup config file to install again
+        try:
+            # only rename default config file
+            if config_file == def_cfgfile:
+                os.rename(config_file, config_file + '.bak' + ts)
+        except OSError:
+            log_err('Cannot rename config file')
 
-    ################
-    # clean up work
-    ################
-    # rename default config file when successfully installed
-    # so next time user can input new variables for a new install
-    # or specify the backup config file to install again
-    try:
-        # only rename default config file
-        if config_file == def_cfgfile:
-            os.rename(config_file, config_file + '.bak' + ts)
-    except OSError:
-        log_err('Cannot rename config file')
-
-    # remove temp config file
-    if os.path.exists(tmp_file): os.remove(tmp_file)
+        # remove temp config file
+        if os.path.exists(tmp_file): os.remove(tmp_file)
     
+    else:
+        format_output('DryRun Complete')
+
 if __name__ == "__main__":
     try:
         main()

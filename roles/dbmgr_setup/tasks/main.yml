@@ -1,6 +1,10 @@
 ---
-- set_fact:
-    dbmgr_rpm: '/home/centos/esgyndb-installer/esgynDB-manager-2.0.1-1.x86_64.rpm'
+#- set_fact:
+#    dbmgr_rpm: '/home/centos/esgyndb-installer/esgynDB-manager-2.0.1-1.x86_64.rpm'
+- name: Make sure Trafodion is installed
+  shell: "rpm -qa|grep -q {{ rpm_basename }}"
+  register: traf_installed
+  failed_when: traf_installed.rc==1
 
 - name: Get RPM full name
   shell: "echo {{ dbmgr_rpm }} | awk -F/ '{print $NF}'"
@@ -28,12 +32,11 @@
 - set_fact:
     mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
     dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
-    hbase_xml_file: "/etc/hbase/conf/hbase-site.xml"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
 - set_fact:
     dcs_master_host: "{{ dcs_ip }}"
-  when: dcs_ip!=''
+  when: dcs_ip is defined
 
 # This script will use hbase shell, so it should be better to run on regionserver node
 # But esgyndb manager will be installed on the same node as Trafodion, so we have to run it on first trafodion node
