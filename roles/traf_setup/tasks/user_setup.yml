@@ -1,9 +1,4 @@
 ---
-#- name: create trafodion user if not exists
-#  user: name=trafodion shell=/bin/bash state=present
-#  become: yes
-#  #user: name=trafodion shell=/bin/bash state=absent remove=yes
-
 - name: parse trafodion user password
   shell: "echo {{ traf_pwd }} | base64 -d 2>/dev/null"
   register: pwd
@@ -12,14 +7,13 @@
   shell: "openssl passwd {{ pwd.stdout }}"
   register: pwd
 
-
 - name: Set trafodion user password
   user: name=trafodion password="{{ pwd.stdout }}"
   become: yes
-  
 
-#- name: backup original bashrc file
-
+- name: backup original bashrc file
+  shell: "cp /home/trafodion/.bashrc{,.bak}"
+  become: yes
 
 - name: modify bashrc file for trafodion user
   template: src=bashrc_default.j2 dest=/home/trafodion/.bashrc
@@ -29,7 +23,6 @@
   copy: src=trafodion.conf dest=/etc/security/limits.d/
   become: yes
 
-# ssh-keygen -t rsa -N "" -f $HOME/.ssh/id_rsa
 - name: generate ssh keys for trafodion user
   user: name=trafodion generate_ssh_key=yes ssh_key_bits=2048 ssh_key_file=.ssh/id_rsa 
   become: yes
@@ -42,15 +35,13 @@
   fetch: src=/home/trafodion/.ssh/id_rsa.pub dest=/tmp/fetched/
   become: yes
 
-  # TODO: set hostname 'eason-1' to a var
 - name: copy private key to all nodes
-  copy: src=/tmp/fetched/eason-1/home/trafodion/.ssh/id_rsa dest=/home/trafodion/.ssh/ mode=600
+  copy: src=/tmp/fetched/{{ groups['firstnode'][0] }}/home/trafodion/.ssh/id_rsa dest=/home/trafodion/.ssh/ mode=600
   become: yes
   become_user: trafodion
 
-  # TODO: set hostname 'eason-1' to a var
 - name: copy public key to all nodes
-  copy: src=/tmp/fetched/eason-1/home/trafodion/.ssh/id_rsa.pub dest=/home/trafodion/.ssh/ mode=600
+  copy: src=/tmp/fetched/{{ groups['firstnode'][0] }}/home/trafodion/.ssh/id_rsa.pub dest=/home/trafodion/.ssh/ mode=600
   become: yes
   become_user: trafodion
 
@@ -59,9 +50,8 @@
   become: yes
   become_user: trafodion
 
-  # TODO: set hostname 'eason-1' to a var
 - name: generate authorized_keys on all nodes
-  authorized_key: user=trafodion key="{{ lookup('file', '/tmp/fetched/eason-1/home/trafodion/.ssh/id_rsa.pub') }}"
+  authorized_key: user=trafodion key="{{ item }}"
+  with_file: "/tmp/fetched/{{ groups['firstnode'][0] }}/home/trafodion/.ssh/id_rsa.pub"
   become: yes
   become_user: trafodion
-
