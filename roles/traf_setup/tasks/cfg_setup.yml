@@ -1,4 +1,4 @@
-# TODO: add ldap security config
+---
 - name: Disable iptables
   service: name=iptables state=stopped
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
