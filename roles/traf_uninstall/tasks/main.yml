@@ -23,6 +23,7 @@
   shell: "ps -ef|grep trafodion|grep -v grep |awk '{print $2}'|xargs kill -9; echo -n"
   become: yes
   become_user: trafodion
+  ignore_errors: true
 
 - name: Delete trafodion user
   user: name=trafodion state=absent remove=yes
