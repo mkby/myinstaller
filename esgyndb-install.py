@@ -412,6 +412,14 @@ def user_input(no_dbmgr=False):
         g('dcs_interface')
         g('dcs_bknodes')
 
+# set time format from seconds to h:m:s
+def time_elapse(start, end):
+    seconds = end - start
+    hours = seconds / 3600
+    seconds = seconds % 3600
+    minutes = seconds / 60
+    seconds = seconds % 60
+    print "Installation time: %d hour(s) %d minute(s) %d second(s)" % (hours, minutes, seconds)
 
 def pre_check():
     """ check required packages should be installed """
@@ -439,6 +447,8 @@ def main():
     parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
                 help="Specify ssh login user for remote server, \
                       if not provided, use current login user as default.")
+    parser.add_option("-b", "--become-method", dest="method", metavar="METHOD",
+                help="Specify become method for ansible.")
     parser.add_option("-f", "--fork", dest="fork", metavar="FORK",
                 help="Specify number of parallel processes to use for ansible(default=5)" )
     parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=False,
@@ -475,7 +485,7 @@ def main():
     p = ParseJson(config_file)
 
     # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    no_dbmgr = False
+    no_dbmgr = True
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):
@@ -583,6 +593,8 @@ def main():
         #############################
         format_output('Ansible Installation start')
 
+        start_time = time.time()
+
         cmd = 'ansible-playbook %s/install.yml -i %s/hosts -e \'%s\'' % \
             (installer_loc, installer_loc, json.dumps(cfgs))
 
@@ -604,12 +616,16 @@ def main():
         if options.verbose: cmd += ' -v'
         if options.user: cmd += ' -u %s' % options.user
         if options.fork: cmd += ' -f %s' % options.fork
+        if options.method: cmd += ' --become-method=%s' % options.method
 
         rc = os.system(cmd)
         if rc: log_err('Failed to install EsgynDB by ansible, please check log file %s for details.\n\
     Double check config file \'%s\' to make sure nothing is wrong.' % (log_path, config_file))
 
         format_output('EsgynDB Installation Complete')
+
+        end_time = time.time()
+        time_elapse(start_time, end_time)
 
         ################
         # clean up work
