@@ -97,6 +97,9 @@
   become_user: trafodion
   become: yes
 
+- set_fact:
+    zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
+
 - name: Edit opentsdb.conf for zookeeper nodes
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
            regexp='tsd.storage.hbase.zk_quorum = .*'
@@ -126,10 +129,6 @@
 - name: Get zookeeper quorum
   shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
   register: zookeeper_quorum
-
-- set_fact:
-    zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
-
 
 - name: Edit openTSDB logback.xml
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/logback.xml
