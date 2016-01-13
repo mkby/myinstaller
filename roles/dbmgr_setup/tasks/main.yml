@@ -1,6 +1,4 @@
 ---
-#- set_fact:
-#    dbmgr_rpm: '/home/centos/esgyndb-installer/esgynDB-manager-2.0.1-1.x86_64.rpm'
 - name: Make sure Trafodion is installed
   shell: "rpm -qa|grep -q {{ rpm_basename }}"
   register: traf_installed
@@ -37,6 +35,21 @@
 - set_fact:
     dcs_master_host: "{{ dcs_ip }}"
   when: dcs_ip is defined
+
+- name: Export jython path to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export PATH=$PATH:{{ mgblty_install_dir }}/jython2.7.0/bin"
+  become: yes
+
+- name: Export mgblty install dir to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}"
+  become: yes
+
+- name: Export dbmgr install dir to bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              line="export DBMGR_INSTALL_DIR={{ dbmgr_install_dir }}"
+  become: yes
 
 # This script will use hbase shell, so it should be better to run on regionserver node
 # But esgyndb manager will be installed on the same node as Trafodion, so we have to run it on first trafodion node
@@ -84,8 +97,15 @@
   become_user: trafodion
   become: yes
 
+- name: Edit opentsdb.conf for zookeeper nodes
+  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+           regexp='tsd.storage.hbase.zk_quorum = .*'
+           replace="tsd.storage.hbase.zk_quorum = {{ ','.join(zkhosts.split()) }}"
+  become_user: trafodion
+  become: yes
+
 - name: Registering Metrics
-  shell: "export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}; {{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
+  shell: "source /home/trafodion/.bashrc; {{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
   become_user: trafodion
   become: yes
   when: inventory_hostname in groups['firstnode']
@@ -110,12 +130,6 @@
 - set_fact:
     zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
 
-- name: Edit opentsdb.conf for zookeeper nodes
-  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
-           regexp='tsd.storage.hbase.zk_quorum = .*'
-           replace="tsd.storage.hbase.zk_quorum = {{ ','.join(zkhosts.split()) }}"
-  become_user: trafodion
-  become: yes
 
 - name: Edit openTSDB logback.xml
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/logback.xml
@@ -128,18 +142,3 @@
   shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }}"
   become: yes
   become_user: trafodion
-
-- name: Export jython path to bashrc
-  lineinfile: dest=/home/trafodion/.bashrc
-              line="export PATH=$PATH:{{ mgblty_install_dir }}/jython2.7.0/bin"
-  become: yes
-
-- name: Export mgblty install dir to bashrc
-  lineinfile: dest=/home/trafodion/.bashrc
-              line="export MGBLTY_INSTALL_DIR={{ mgblty_install_dir }}"
-  become: yes
-
-- name: Export dbmgr install dir to bashrc
-  lineinfile: dest=/home/trafodion/.bashrc
-              line="export DBMGR_INSTALL_DIR={{ dbmgr_install_dir }}"
-  become: yes
