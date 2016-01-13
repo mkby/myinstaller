@@ -451,7 +451,7 @@ def main():
                 help="Specify become method for ansible.")
     parser.add_option("-f", "--fork", dest="fork", metavar="FORK",
                 help="Specify number of parallel processes to use for ansible(default=5)" )
-    parser.add_option("-d", "--disable-pass", action="store_false", dest="dispass", default=False,
+    parser.add_option("-d", "--disable-pass", action="store_true", dest="dispass", default=False,
                 help="Do not prompt SSH login password for remote hosts. \
                       If set, be sure passwordless ssh is configured.")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
@@ -485,7 +485,7 @@ def main():
     p = ParseJson(config_file)
 
     # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    no_dbmgr = True
+    no_dbmgr = False
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):
