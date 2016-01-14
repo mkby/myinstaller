@@ -8,7 +8,7 @@
   become_user: root
   become: yes
 
-#set as default value
+# set default value
 - set_fact:
     hbase_lib_path: "/usr/lib/hbase/lib"
 
