@@ -1,26 +1,26 @@
-- name: create sqconfig for trafodion instance
+- name: Create sqconfig for trafodion instance
   script:  traf_sqconfig {{ansible_processor_vcpus - 1}} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
   become: yes
   become_user: trafodion
 
-- name: run sqgen for trafodion instance
+- name: Run sqgen for trafodion instance
   shell: 'source /home/trafodion/.bashrc; sqgen'
   become: yes
   become_user: trafodion
 
-- name: start trafodion instance
+- name: Start trafodion instance
   shell: 'source /home/trafodion/.bashrc; sqstart'
   become: yes
   become_user: trafodion
   when: traf_start=='Y'
 
-- name: initialize trafodion
+- name: Initialize trafodion
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion;\" | sqlci'
   become: yes
   become_user: trafodion
   when: traf_init=='Y'
 
-- name: initialize trafodion
+- name: Initialize trafodion - upgrade
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion, upgrade;\" | sqlci'
   become: yes
   become_user: trafodion
