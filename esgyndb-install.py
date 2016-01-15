@@ -485,7 +485,7 @@ def main():
     p = ParseJson(config_file)
 
     # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    no_dbmgr = False
+    no_dbmgr = True
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):
@@ -583,7 +583,7 @@ def main():
                 f.writelines(node_array)
                 f.write('\n[firstnode]\n')
                 f.write(first_node)
-                f.write('\n[firstrsnode]\n')
+                f.write('\n\n[firstrsnode]\n')
                 f.write(first_rsnode)
         except IOError:
             log_err('Failed to open hosts file')

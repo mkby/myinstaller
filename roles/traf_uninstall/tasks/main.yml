@@ -1,18 +1,34 @@
 ---
-- name: Check trafodion home existence
-  stat: path=/home/trafodion/
-  register: trafuser
+- name: Check trafodion process existence
+  shell: "ps -ef|grep -v grep |grep -c 'monitor COLD'> /dev/null; echo -n"
+  register: instance_exist
   
 - name: Stop trafodion processes if exist
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall; sleep 5"
   become: yes
   become_user: trafodion
   ignore_errors: true
-  when: inventory_hostname in groups['firstnode'] and trafuser.stat.exists==True
+  when: inventory_hostname in groups['firstnode'] and instance_exist.stdout!='0'
 
-- name: Uninstall trafodion RPM
+- name: Uninstall trafodion RPM - RedHat/CentOS
   yum: name=trafodion state=absent
   become: yes
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Uninstall trafodion RPM - SuSE
+  zypper: name=trafodion state=absent
+  become: yes
+  when: ansible_os_family == 'Suse'
+
+- name: Uninstall esgynDB-manager RPM - RedHat/CentOS
+  yum: name=esgynDB-manager state=absent
+  become: yes
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Uninstall esgynDB-manager RPM - SuSE
+  zypper: name=esgynDB-manager state=absent
+  become: yes
+  when: ansible_os_family == 'Suse'
 
 - name: Remove trafodion RPM and user home directory
   shell: "rm /home/trafodion /tmp/trafodion*.rpm /tmp/esgynDB-manager*.rpm -rf"
@@ -21,7 +37,6 @@
 - name: Kill all trafodion user processes
   shell: "ps -ef|grep trafodion|grep -v grep |awk '{print $2}'|xargs kill -9; echo -n"
   become: yes
-  become_user: trafodion
   ignore_errors: true
 
 - name: Remove unused files and settings

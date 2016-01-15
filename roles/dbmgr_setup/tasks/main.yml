@@ -8,15 +8,22 @@
   shell: "echo {{ dbmgr_rpm }} | awk -F/ '{print $NF}'"
   register: fullname
 
-- set_fact:
+- name: Set esgynDB manager RPM name
+  set_fact:
     dbmgr_rpmname: "{{ fullname.stdout }}"
 
 - name: Copy esgynDB manager RPM to all nodes
   copy: src={{ dbmgr_rpm }} dest=/tmp/ force=yes
 
-- name: Install esgynDB manager RPM
+- name: Install esgynDB manager RPM - CentOS/RedHat
   yum: name="/tmp/{{ dbmgr_rpmname }}" state=present
   become: yes
+  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+
+- name: Install esgynDB manager RPM - SuSE
+  zypper: name="/tmp/{{ dbmgr_rpmname }}" state=present
+  become: yes
+  when: ansible_os_family == 'Suse'
 
 - name: Get esgynDB manager RPM install location
   shell: "rpm -ql esgynDB-manager|head -1"
@@ -27,12 +34,14 @@
   register: dbmgr_version
   when: dbmgr_loc|success
 
-- set_fact:
+- name: Set mgblty and dbmgr install directory
+  set_fact:
     mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
     dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
-- set_fact:
+- name: Set dcs master hostname if DCS HA enabled
+  set_fact:
     dcs_master_host: "{{ dcs_ip }}"
   when: dcs_ip is defined
 
@@ -63,7 +72,8 @@
   script: check_ports.py
   register: ports
 
-- set_fact:
+- name: Get esgynDB manager ports
+  set_fact:
     dm_http_port: "{{ ports.stdout_lines[0] }}"
     dm_https_port: "{{ ports.stdout_lines[1] }}"
     tsd_port: "{{ ports.stdout_lines[2] }}"
@@ -97,7 +107,8 @@
   become_user: trafodion
   become: yes
 
-- set_fact:
+- name: Get zookeeper hostname
+  set_fact:
     zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
 
 - name: Edit opentsdb.conf for zookeeper nodes

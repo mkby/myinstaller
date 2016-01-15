@@ -8,12 +8,12 @@
   become_user: root
   become: yes
 
-# set default value
+# set as default value
 - set_fact:
     hbase_lib_path: "/usr/lib/hbase/lib"
 
 # use the default parcel dir
-- name: Detect HBase lib path for cdh parcel
+- name: Detect Hbase lib path for cdh parcel
   stat: path=/opt/cloudera/parcels/CDH/lib/hbase/lib
   register: parcel
 
@@ -40,12 +40,17 @@
     zk_hosts: "{{ zookeeper_quorum.stdout }}"
     dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
     dcs_bkmaster_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
+    dcs_env_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-env.sh"
     dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
     rest_site_file: "{{ sq_root }}/rest-{{ traf_ver }}/conf/rest-site.xml"
 
 - set_fact:
     dcs_backup_nodes: "{{ dcs_bknodes.split() }}"
   when: dcs_bknodes is defined
+
+- name: Modify dcs-env.sh
+  replace: dest={{ dcs_env_file }} regexp='# export DCS_MANAGES_ZK=true' replace='export DCS_MANAGES_ZK=false'
+  become: yes
 
 - name: Generate dcs-site.xml
   template: src=dcs-site.xml.j2 dest={{ dcs_site_file }}
