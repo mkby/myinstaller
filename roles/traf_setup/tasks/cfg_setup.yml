@@ -8,6 +8,11 @@
   become_user: root
   become: yes
 
+- name: Set max Kernel pid to sysctl.conf
+  lineinfile: dest=/etc/sysctl.conf line="kernel.pid_max=65535"
+  become_user: root
+  become: yes
+
 # set as default value
 - set_fact:
     hbase_lib_path: "/usr/lib/hbase/lib"
