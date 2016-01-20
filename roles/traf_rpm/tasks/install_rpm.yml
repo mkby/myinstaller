@@ -20,11 +20,20 @@
   register: rpm_installed
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
+# use zypper command directly since zypper module has bug
+# which has been fixed only in later version of ansible
+# https://github.com/ansible/ansible-modules-extras/pull/1256
 - name: Install trafodion RPM - SuSE
-  zypper: name="/tmp/{{ rpm_name }}" state=present
+  shell: "zypper install /tmp/{{ rpm_name }}"
   become: yes
   register: rpm_installed_suse
   when: ansible_os_family == 'Suse'
+
+#- name: Install trafodion RPM - SuSE
+#  zypper: name="/tmp/{{ rpm_name }}" state=present
+#  become: yes
+#  register: rpm_installed_suse
+#  when: ansible_os_family == 'Suse'
 
 - name: Reinstall trafodion RPM if already installed - CentOS
   shell: "rpm -i /tmp/{{ rpm_name }} --force"

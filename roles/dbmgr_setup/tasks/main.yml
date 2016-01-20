@@ -20,10 +20,18 @@
   become: yes
   when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
 
+# use zypper command directly since zypper module has bug
+# which has been fixed only in later version of ansible
+# https://github.com/ansible/ansible-modules-extras/pull/1256
 - name: Install esgynDB manager RPM - SuSE
-  zypper: name="/tmp/{{ dbmgr_rpmname }}" state=present
+  shell: "zypper install /tmp/{{ dbmgr_rpmname }}"
   become: yes
   when: ansible_os_family == 'Suse'
+
+#- name: Install esgynDB manager RPM - SuSE
+#  zypper: name="/tmp/{{ dbmgr_rpmname }}" state=present
+#  become: yes
+#  when: ansible_os_family == 'Suse'
 
 - name: Get esgynDB manager RPM install location
   shell: "rpm -ql esgynDB-manager|head -1"

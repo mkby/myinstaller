@@ -39,6 +39,9 @@ def main():
     (options, args) = parser.parse_args()
 
     # calling ansible to uninstall
+    rc = raw_input('Uninstall trafodion, press [y] to continue: ')
+    if rc.lower() != 'y': sys.exit(1)
+
     format_output('Uninstall Start')
 
     cmd = 'ansible-playbook %s/uninstall.yml ' % installer_loc
