@@ -381,7 +381,7 @@ def user_input(no_dbmgr=False):
         else:
             cfgs['node_list'] = ' ' + node_list
 
-        check_node_conn()
+    check_node_conn()
     
     g('traf_pwd')
     g('traf_start')

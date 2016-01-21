@@ -24,7 +24,7 @@
 # which has been fixed only in later version of ansible
 # https://github.com/ansible/ansible-modules-extras/pull/1256
 - name: Install trafodion RPM - SuSE
-  shell: "zypper install /tmp/{{ rpm_name }}"
+  shell: "zypper install -y /tmp/{{ rpm_name }}"
   become: yes
   register: rpm_installed_suse
   when: ansible_os_family == 'Suse'

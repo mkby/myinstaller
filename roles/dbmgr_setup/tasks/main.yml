@@ -24,7 +24,7 @@
 # which has been fixed only in later version of ansible
 # https://github.com/ansible/ansible-modules-extras/pull/1256
 - name: Install esgynDB manager RPM - SuSE
-  shell: "zypper install /tmp/{{ dbmgr_rpmname }}"
+  shell: "zypper install -y /tmp/{{ dbmgr_rpmname }}"
   become: yes
   when: ansible_os_family == 'Suse'
 

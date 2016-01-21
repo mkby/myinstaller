@@ -13,8 +13,17 @@
   become_user: root
   become: yes
 
+- stat: path=/tmp/hsperfdata_trafodion
+  register: hsperfdata
+
+- name: Set ownership for /tmp/hsperfdata_trafodion folder
+  file: path=/tmp/hsperfdata_trafodion owner=trafodion group=trafodion mode=0755
+  become: yes
+  when: hsperfdata.stat.exists==True
+
 # set as default value
-- set_fact:
+- name: Set default HBase lib path
+  set_fact:
     hbase_lib_path: "/usr/lib/hbase/lib"
 
 # use the default parcel dir
