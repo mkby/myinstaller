@@ -399,7 +399,7 @@ def user_input(no_dbmgr=False):
         if  ldap_encrypt == '1' or ldap_encrypt == '2':
             g('ldap_certpath')
         elif ldap_encrypt == '0':
-            pass
+            cfgs['ldap_certpath'] = ''
         else:
             log_err('Invalid ldap encryption level')
 
@@ -485,7 +485,7 @@ def main():
     p = ParseJson(config_file)
 
     # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    no_dbmgr = True
+    no_dbmgr = False
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):

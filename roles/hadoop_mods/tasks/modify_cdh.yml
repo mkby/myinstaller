@@ -1,4 +1,24 @@
 # modify Cloudera services config
+- name: Detect ansible version 
+  shell: "ansible-playbook --version|grep ansible-playbook |awk '{print $2}'"
+  register: ansible_ver
+
+- name: Set hadoop config json file name - 1
+  set_fact:
+    hdfs_conf: hdfs_config.json
+    hbase_master_conf: hbase_master_config.json
+    hbase_rs_conf: hbase_rs_config.json
+    zk_conf: zookeeper_config.json
+    version_flag: "{{ ansible_ver.stdout | version_compare('2.0', operator='gt') }}"
+
+- name: Set hadoop config json file name - 2
+  set_fact:
+    hdfs_conf: hdfs_config2.json
+    hbase_master_conf: hbase_master_config2.json
+    hbase_rs_conf: hbase_rs_config2.json
+    zk_conf: zookeeper_config2.json
+  when: version_flag == True
+
 - name: Change HDFS config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hdfs/config
        method=PUT
@@ -6,7 +26,7 @@
        user={{ mgr_user }}
        password={{ mgrpwd }}
        validate_certs=no
-       body="{{ lookup('file','hdfs_config.json') }}"
+       body="{{ lookup('file', hdfs_conf) }}"
   register: hdfs_config_result
 
 - name: Change HBase master config using Cloudera REST api
@@ -16,7 +36,7 @@
        user={{ mgr_user }}
        password={{ mgrpwd }}
        validate_certs=no
-       body="{{ lookup('file','hbase_master_config.json') }}"
+       body="{{ lookup('file', hbase_master_conf) }}"
   register: hbase_master_config_result
 
 - set_fact:
@@ -31,12 +51,14 @@
   register: rcg
 
 # get all region server groups
-- set_fact:
+- name: Get all Region Server groups
+  set_fact:
     rs_grpname:  "{% for i in rcg.json['items'] %} 
                     {% if i.roleType=='REGIONSERVER' %}  {{ i.name }} {% endif %}
                   {% endfor %}"
 
-- set_fact:
+- name: Get Region Server groups list
+  set_fact:
     rs_grplist: "{{ rs_grpname.split() }}"
 
 # modify configs on all regionserver groups
@@ -47,7 +69,7 @@
        user={{ mgr_user }}
        password={{ mgrpwd }}
        validate_certs=no
-       body="{{ lookup('file','hbase_rs_config.json') }}"
+       body="{{ lookup('file', hbase_rs_conf) }}"
   with_items: rs_grplist
   register: hbase_rs_config_result
 
@@ -58,5 +80,5 @@
        user={{ mgr_user }}
        password={{ mgrpwd }}
        validate_certs=no
-       body="{{ lookup('file','zookeeper_config.json') }}"
+       body="{{ lookup('file', zk_conf) }}"
   register: zookeeper_config_result

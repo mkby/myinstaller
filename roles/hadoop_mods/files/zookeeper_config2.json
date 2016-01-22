@@ -1,0 +1,10 @@
+{ "roleTypeConfigs" :  
+    [ {
+        "roleType" : "SERVER",
+        "items": 
+           [ {
+           "name"  : "maxClientCnxns",
+           "value" : "0"
+           } ]
+    } ]
+}'
