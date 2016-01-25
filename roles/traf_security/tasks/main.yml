@@ -7,7 +7,7 @@
   when: ldap_security == 'Y'
 
 - name: Check LDAP config file using ldapconfigcheck
-  shell: "source /home/trafodion/.bashrc; ldapconfigcheck -file {{ sq_root.stdout }}/sql/scripts/traf_authentication_config"
+  shell: "source /home/trafodion/.bashrc; ldapconfigcheck -file {{ sq_root }}/sql/scripts/traf_authentication_config"
   become_user: trafodion
   become: yes
   when: ldap_security == 'Y'

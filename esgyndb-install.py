@@ -144,16 +144,21 @@ class UserInput:
             {
                 'prompt':'Enter full path to TLS certificate',
             },
+            'ldap_userinfo':
+            {
+                'prompt':'If Requred search user name/password',
+                'default':'N',
+                'isYN':True
+            },
             'ldap_user':
             {
                 'prompt':'Enter Search user name (if required)',
-                'default':'None',
-                'isuser': True
+                'default':' ',
             },
             'ldap_pwd':
             {
                 'prompt':'Enter Search password (if required)',
-                'ispasswd':True
+                'default':' ',
             },
             'java_home':
             {
@@ -403,8 +408,12 @@ def user_input(no_dbmgr=False):
         else:
             log_err('Invalid ldap encryption level')
 
-        g('ldap_user')
-        g('ldap_pwd')
+        if g('ldap_userinfo') == 'Y':
+            g('ldap_user')
+            g('ldap_pwd')
+        else:
+            cfgs['ldap_user'] = ''
+            cfgs['ldap_pwd'] = ''
 
     # DCS HA
     if g('dcs_ha') == 'Y':
