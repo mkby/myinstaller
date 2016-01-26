@@ -105,8 +105,10 @@
   become: yes
 
 - name: Get timezone
-  script: gettimezone.sh
+  shell: "{{ dbmgr_install_dir }}/bin/gettimezone.sh"
   register: tz
+  become_user: trafodion
+  become: yes
 
 - name: Edit opentsdb.conf for time zone
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
