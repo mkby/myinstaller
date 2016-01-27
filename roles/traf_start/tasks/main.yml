@@ -1,5 +1,9 @@
+- name: Set CPU core number
+  set_fact:
+    cpu_core: "{% if ansible_processor_vcpus > 16 %}15{% else %}{{ ansible_processor_vcpus -1 }}{% endif %}"
+
 - name: Create sqconfig for trafodion instance
-  script:  traf_sqconfig {{ansible_processor_vcpus - 1}} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
+  script:  traf_sqconfig {{cpu_core}} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
   become: yes
   become_user: trafodion
 
