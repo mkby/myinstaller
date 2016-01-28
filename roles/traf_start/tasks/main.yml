@@ -22,10 +22,10 @@
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion;\" | sqlci'
   become: yes
   become_user: trafodion
-  when: traf_init=='Y'
+  when: traf_init=='Y' and traf_start=='Y'
 
 - name: Initialize trafodion - upgrade
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion, upgrade;\" | sqlci'
   become: yes
   become_user: trafodion
-  when: traf_init=='N'
+  when: traf_init=='N' and traf_start=='Y'

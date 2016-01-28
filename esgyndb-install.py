@@ -66,7 +66,8 @@ class HttpGet:
             try:
                 return defaultdict(str, json.loads(content))
             except ValueError:
-                log_err('No json format found in http content')
+                #log_err('No json format found in http content')
+                log_err('Failed to get data from manager URL, check if password is correct')
             
 
 class UserInput:
@@ -359,6 +360,12 @@ def user_input(no_dbmgr=False):
     else:
         g('traf_rpm')
 
+    # get rpm basename from rpm filename
+    try:
+        cfgs['rpm_basename'] = re.search(r'\/(\w+)-\d\.\d\.\d-.*', cfgs['traf_rpm']).group(1)
+    except:
+        log_err('Invalid RPM name, be careful don\'t rename RPM name')
+
     if not no_dbmgr:
         # find esgyndb manager rpm in installer folder, if more than one
         # rpm found, use the first one
@@ -378,13 +385,22 @@ def user_input(no_dbmgr=False):
     check_mgr_url()
 
     if  g('use_hbase_node') == 'N':
-        node_list = ' '.join(expNumRe(g('node_list')))
-        print ' === NODE LIST ===\n' + node_list
-        confirm = u.getinput('confirm', '')
-        if confirm == 'N': 
-            log_err('Incorrect node list, aborted...')
-        else:
-            cfgs['node_list'] = ' ' + node_list
+        cnt = 0
+        # give user another try if input is wrong
+        while cnt <= 2:
+            cnt += 1
+            if cnt == 2: print ' === Please try to input node list again ==='
+            node_list = ' '.join(expNumRe(g('node_list')))
+            print ' === NODE LIST ===\n' + node_list
+            confirm = u.getinput('confirm', '')
+            if confirm == 'N': 
+                if cnt <= 1:
+                    continue
+                else:
+                    log_err('Incorrect node list, aborted...')
+            else:
+                cfgs['node_list'] = ' ' + node_list
+                break
 
     check_node_conn()
     
@@ -465,7 +481,7 @@ def main():
                       If set, be sure passwordless ssh is configured.")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
                 help="Verbose mode for ansible.")
-    parser.add_option("--dry-run", action="store_true", dest="dryrun", default=False,
+    parser.add_option("--dryrun", action="store_true", dest="dryrun", default=False,
                 help="Dry run mode, it will only generate the config file.") 
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
                 help="Install esgynDB manager only, be sure esgynDB is previously installed.")
@@ -545,7 +561,8 @@ def main():
         cfgs['cluster_name'] = cluster_name.replace(' ','%20')
 
         cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
-        cfgs['rpm_basename'] = 'trafodion'
+
+
         cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
 
         # save config file as json format

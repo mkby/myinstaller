@@ -37,7 +37,7 @@
 
 # cdh setting, just put it here to run on all nodes
 - name: Copy HBase trx jar file to all nodes
-  shell: "cp /home/trafodion/trafodion-{{ traf_ver }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }}"
+  shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_ver }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }}"
   become: yes
 
 # dcs
