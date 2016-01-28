@@ -44,8 +44,8 @@
 
 - name: Set mgblty and dbmgr install directory
   set_fact:
-    mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
-    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
+    mgblty_install_dir: "{{ dbmgr_loc.stdout }}"
+    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
 - name: Set dcs master hostname if DCS HA enabled
