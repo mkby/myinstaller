@@ -109,7 +109,8 @@ class UserInput:
             },
             'dcs_interface':
             {
-                'prompt':'Enter interface for Floating IP address (example: eth0)',
+                'prompt':'Enter interface for Floating IP address',
+                'default':'eth0',
             },
             'dcs_bknodes':
             {
@@ -189,13 +190,24 @@ class UserInput:
             },
             'traf_pwd':
             {
-                'prompt':'Enter trafodion password',
+                'prompt':'Enter trafodion user password',
                 'ispasswd':True
             },
             'traf_rpm':
             {
                 'prompt':'Enter full path to Trafodion RPM file',
                 'isexist': True
+            },
+            'db_admin_user':
+            {
+                'prompt':'Enter DB Admin user name for esgynDB manager',
+                'default':'DB__ADMINUSER',
+                'isuser': True
+            },
+            'db_admin_pwd':
+            {
+                'prompt':'Enter DB Admin user password for esgynDB manager',
+                'default':'traf123',
             },
             'dbmgr_rpm':
             {
@@ -369,11 +381,14 @@ def user_input(no_dbmgr=False):
     if not no_dbmgr:
         # find esgyndb manager rpm in installer folder, if more than one
         # rpm found, use the first one
+        # we don't get dbmgr rpm name from filename because dbmgr has uniq rpm name
         dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
         if dbmgr_rpm:
             u.getinput('dbmgr_rpm', dbmgr_rpm[0])
         else:
             g('dbmgr_rpm')
+        g('db_admin_user')
+        g('db_admin_pwd')
 
     url = g('mgr_url')
     if not ('http:' in url or 'https:' in url): 
@@ -483,6 +498,8 @@ def main():
                 help="Verbose mode for ansible.")
     parser.add_option("--dryrun", action="store_true", dest="dryrun", default=False,
                 help="Dry run mode, it will only generate the config file.") 
+    parser.add_option("--no-dbmgr", action="store_true", dest="nodbmgr", default=False,
+                help="Do not install esgynDB manager.")
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
                 help="Install esgynDB manager only, be sure esgynDB is previously installed.")
     parser.add_option("--dbmgr-rpm", dest="dbmgrrpm", metavar="RPMFILE",
@@ -491,8 +508,16 @@ def main():
     (options, args) = parser.parse_args()
 
     # handle parser option
-    if options.dbmgr and not options.dbmgrrpm: log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
-    if not options.dbmgr and options.dbmgrrpm: log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
+    if options.dbmgr and options.nodbmgr:
+        log_err('Wrong parameter, cannot specify both --dbmgr-only and --no-dbmgr')
+    if bool(options.dbmgr) != bool(options.dbmgrrpm):
+        log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
+
+    # set no_dbmgr flag
+    if options.nodbmgr:
+        no_dbmgr = True
+    else:
+        no_dbmgr = False
 
     #######################################
     # get user input and gen variable file
@@ -508,9 +533,6 @@ def main():
         config_file = def_cfgfile
 
     p = ParseJson(config_file)
-
-    # TODO: get a way to determine trafodion/esgyndb, set the flag to true or false
-    no_dbmgr = False
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):
@@ -551,7 +573,7 @@ def main():
 
         rsnodes.sort()
         # set trafodion node list the same as HBase RS nodes
-        if not cfgs['node_list']:
+        if cfgs['use_hbase_node'] == 'Y':
             cfgs['node_list'] = ' ' + ' '.join(rsnodes)
 
         # set other config to cfgs

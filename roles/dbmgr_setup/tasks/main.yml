@@ -44,8 +44,8 @@
 
 - name: Set mgblty and dbmgr install directory
   set_fact:
-    mgblty_install_dir: "{{ dbmgr_loc.stdout }}"
-    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}"
+    mgblty_install_dir: "{{ dbmgr_loc.stdout}}/mgblty"
+    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}/dbmgr-{{ dbmgr_version.stdout }}"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
 - name: Set dcs master hostname if DCS HA enabled
@@ -159,6 +159,6 @@
 
 
 - name: Configure esgynDB manager
-  shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }}"
+  shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }} --adminuser {{ db_admin_user }} --adminpassword {{ db_admin_password }}"
   become: yes
   become_user: trafodion

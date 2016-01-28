@@ -1,6 +1,6 @@
 ---
 - name: Check trafodion process existence
-  shell: "ps -ef|grep -v grep |grep -c 'monitor COLD'> /dev/null; echo -n"
+  shell: "ps -ef|grep -v grep |grep -c 'monitor COLD' 2>/dev/null; echo -n"
   register: instance_exist
   
 - name: Stop trafodion processes if exist
