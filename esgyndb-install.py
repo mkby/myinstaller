@@ -351,6 +351,7 @@ def check_mgr_url():
     # validate url, will not validate user/passwd here
     hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
     hg.get_content(cfgs['mgr_url'], test=True)
+    return hg
 
 def user_input(no_dbmgr=False):
     """ get user's input and check input value """
@@ -397,8 +398,43 @@ def user_input(no_dbmgr=False):
     g('mgr_user')
     g('mgr_pwd')
 
-    check_mgr_url()
+    hg = check_mgr_url()
+    cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
 
+    # get cluster info, assume only one cluster being managed
+    cluster_name = cm['clusters'][0]['displayName']
+    cluster_version = cm['clusters'][0]['version']
+    fullversion = cm['clusters'][0]['fullVersion']
+
+    # TODO: support HDP later
+    if not 'CDH' in cluster_version:
+        log_err('Cannot detect Cloudera, currently EsgynDB only supports CDH')
+    elif not '5.4' in fullversion:
+        log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+
+
+    # get list of HBase RegionServer nodes
+    hostids = []
+    rsnodes = []
+    for c in cm['clusters']:
+        if c['displayName'] == cluster_name:
+            for s in c['services']:
+                if s['type'] == 'HBASE':
+                    for r in s['roles']:
+                        if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
+
+    for i in hostids:
+        for h in cm['hosts']:
+            if i == h['hostId']: rsnodes.append(h['hostname'])
+
+    rsnodes.sort()
+    # use short hostname
+    try:
+        rsnodes = [re.match(r'([\w\-]+).*',n).group(1) for n in rsnodes]
+    except AttributeError:
+        pass
+
+    # manually set node list
     if  g('use_hbase_node') == 'N':
         cnt = 0
         # give user another try if input is wrong
@@ -416,8 +452,19 @@ def user_input(no_dbmgr=False):
             else:
                 cfgs['node_list'] = ' ' + node_list
                 break
+    else:
+        cfgs['node_list'] = ' ' + ' '.join(rsnodes)
 
     check_node_conn()
+
+
+    # set other config to cfgs
+    cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
+    cfgs['first_node'] = cfgs['node_list'].split()[0]
+    cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
+    cfgs['cluster_name'] = cluster_name.replace(' ','%20')
+    cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
+    cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
     
     g('traf_pwd')
     g('traf_start')
@@ -451,6 +498,9 @@ def user_input(no_dbmgr=False):
         g('dcs_ip')
         g('dcs_interface')
         g('dcs_bknodes')
+        # check dcs backup nodes should exist in node list
+        if sorted(list(set((cfgs['dcs_bknodes'] + ' ' + cfgs['node_list']).split()))) != sorted(cfgs['node_list'].split()):
+            log_err('Invalid DCS backup nodes, please pick up from node list')
 
 # set time format from seconds to h:m:s
 def time_elapse(start, end):
@@ -543,49 +593,6 @@ def main():
         if options.dryrun: format_output('DryRun Start')
         user_input(no_dbmgr)
         
-        hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
-
-        cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
-        # get cluster info, assume only one cluster being managed
-        cluster_name = cm['clusters'][0]['displayName']
-        cluster_version = cm['clusters'][0]['version']
-        fullversion = cm['clusters'][0]['fullVersion']
-
-        # TODO: support HDP later
-        if not 'CDH' in cluster_version:
-            log_err('Cannot detect Cloudera, currently EsgynDB only supports CDH')
-        elif not '5.4' in fullversion:
-            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
-
-        # get list of HBase RegionServer nodes
-        hostids = []
-        rsnodes = []
-        for c in cm['clusters']:
-            if c['displayName'] == cluster_name:
-                for s in c['services']:
-                    if s['type'] == 'HBASE':
-                        for r in s['roles']:
-                            if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
-
-        for i in hostids:
-            for h in cm['hosts']:
-                if i == h['hostId']: rsnodes.append(h['hostname'])
-
-        rsnodes.sort()
-        # set trafodion node list the same as HBase RS nodes
-        if cfgs['use_hbase_node'] == 'Y':
-            cfgs['node_list'] = ' ' + ' '.join(rsnodes)
-
-        # set other config to cfgs
-        cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
-        cfgs['first_node'] = cfgs['node_list'].split()[0]
-        cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
-        cfgs['cluster_name'] = cluster_name.replace(' ','%20')
-
-        cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
-
-
-        cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
 
         # save config file as json format
         print '\n** Generating json file to save configs ... \n'

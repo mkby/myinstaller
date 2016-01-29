@@ -159,6 +159,6 @@
 
 
 - name: Configure esgynDB manager
-  shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }} --adminuser {{ db_admin_user }} --adminpassword {{ db_admin_password }}"
+  shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }} --adminuser {{ db_admin_user }} --adminpassword {{ db_admin_pwd }}"
   become: yes
   become_user: trafodion

@@ -11,14 +11,15 @@
   user: name=trafodion password="{{ pwd.stdout }}"
   become: yes
 
-- name: backup original bashrc file
-  shell: "if [[ -f /home/trafodion/.bashrc ]]; then cp /home/trafodion/.bashrc{,.bak}; fi"
-  become_user: trafodion
-  become: yes
-
-- name: Set node_count variable for cluster env detection in sqgen
+- name: Set env variables for cluster type detection
   set_fact: 
     node_count: "{{ node_list.split()|length }}"
+    enable_ha: "false"
+
+- name: Set ENABLE_HA env
+  set_fact: 
+    enable_ha: "true"
+  when: dcs_ha=='Y'
 
 - name: modify bashrc file for trafodion user
   template: src=bashrc_default.j2 dest=/home/trafodion/.bashrc

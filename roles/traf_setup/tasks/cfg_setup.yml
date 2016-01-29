@@ -114,3 +114,8 @@
   lineinfile: dest={{ sq_root }}/sqenvcom.sh
               line="export REST_INSTALL_DIR={{ sq_root }}/rest-{{ traf_ver }}"
   become: yes
+
+- name: Run sqcertgen for generating cert file on all nodes 
+  shell: 'source /home/trafodion/.bashrc; sqcertgen'
+  become: yes
+  become_user: trafodion
