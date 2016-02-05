@@ -54,11 +54,14 @@ class HttpGet:
         self.passwd = passwd
         self.h = httplib2.Http(disable_ssl_certificate_validation=True)  
         self.h.add_credentials(self.user, self.passwd)
+        self.headers = {}
 
-    def get_content(self, url, test=False):
+    def get_content(self, url, force_auth=True, test=False):
         self.url = url
         try:
-            resp, content = self.h.request(self.url, "GET")  
+            if force_auth:
+                self.headers["Authorization"] = "Basic %s" % (base64.b64encode("%s:%s" % (self.user, self.passwd)))
+            resp, content = self.h.request(self.url, "GET", headers=self.headers)  
         except:
             log_err('Failed to access manager URL ' + url)
 
