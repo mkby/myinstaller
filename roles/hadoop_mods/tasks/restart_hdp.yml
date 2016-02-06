@@ -1,0 +1,39 @@
+---
+# cannot parse output from hdp rest api using uri module
+# use curl instead
+- set_fact:
+    serv_url: "{{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services"
+
+- name: Stop Hadoop services
+  shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' \
+    -X PUT -d '{\"RequestInfo\": {\"context\" :\"Stop {{ item }} services\"}, \"ServiceInfo\": { \"state\" : \"INSTALLED\" }}' {{ serv_url }}/{{ item }}"
+  with_items:
+    - HBASE
+    - ZOOKEEPER
+    - HDFS
+
+- name: "Check Hadoop services are stopped (timeout: 5mins)"
+  shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' {{ serv_url }}/{{ item }}"
+  register: stop_status
+  until: stop_status.stdout.find('INSTALLED') != -1
+  retries: 60
+  delay: 5
+  with_items:
+    - HBASE
+    - ZOOKEEPER
+    - HDFS
+
+- name: Start all services
+  shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' -X PUT -d '{\"RequestInfo\": {\"context\" :\"Start all services\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}' {{ serv_url }}"
+  register: start_result
+
+- name: Parse url with command id
+  shell: "echo {{ start_result.stdout_lines }} |awk '{print $4}'|sed -r s'#\\\"(.*)\\\".*#\\1#g'"
+  register: cmd_url
+
+- name: "Check Hadoop services are started (timeout: 10mins)"
+  shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' {{ cmd_url.stdout }}"
+  register: start_status
+  until: start_status.stdout.find('COMPLETED') != -1
+  retries: 40
+  delay: 15
