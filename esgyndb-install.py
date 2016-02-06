@@ -353,8 +353,26 @@ def check_node_conn():
 def check_mgr_url():
     # validate url, will not validate user/passwd here
     hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
-    hg.get_content(cfgs['mgr_url'], test=True)
-    return hg
+    validate_url = '%s/api/v1/clusters' % cfgs['mgr_url']
+    content = hg.get_content(validate_url)
+
+    # assume only one cluster being managed
+    try:
+        # HDP
+        distro = content['items'][0]['Clusters']['version']
+        cluster_name = content['items'][0]['Clusters']['cluster_name']
+    except KeyError:
+        # CDH
+        try:
+            distro = content['items'][0]['version']
+            cluster_name = content['items'][0]['name']
+        except KeyError:
+            distro = cluster_name = ''
+
+    if not ('CDH' in distro or 'HDP' in distro):
+        log_err('Cannot detect Cloudera/Hortonworks, currently EsgynDB only supports CDH/HDP')
+
+    return [distro, cluster_name, hg]
 
 def user_input(no_dbmgr=False):
     """ get user's input and check input value """
@@ -401,34 +419,37 @@ def user_input(no_dbmgr=False):
     g('mgr_user')
     g('mgr_pwd')
 
-    hg = check_mgr_url()
-    cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+    distro, cluster_name, hg = check_mgr_url()
+    if 'CDH' in distro:
+        cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
 
-    # get cluster info, assume only one cluster being managed
-    cluster_name = cm['clusters'][0]['displayName']
-    cluster_version = cm['clusters'][0]['version']
-    fullversion = cm['clusters'][0]['fullVersion']
+        # get cluster info, assume only one cluster being managed
+        #cluster_name = cm['clusters'][0]['displayName']
+        cluster_version = cm['clusters'][0]['version']
+        fullversion = cm['clusters'][0]['fullVersion']
 
-    # TODO: support HDP later
-    if not 'CDH' in cluster_version:
-        log_err('Cannot detect Cloudera, currently EsgynDB only supports CDH')
-    elif not '5.4' in fullversion:
-        log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+        if not '5.4' in fullversion:
+            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
 
+        # get list of HBase RegionServer nodes in CDH
+        hostids = []
+        rsnodes = []
+        for c in cm['clusters']:
+            if c['displayName'] == cluster_name:
+                for s in c['services']:
+                    if s['type'] == 'HBASE':
+                        for r in s['roles']:
+                            if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
 
-    # get list of HBase RegionServer nodes
-    hostids = []
-    rsnodes = []
-    for c in cm['clusters']:
-        if c['displayName'] == cluster_name:
-            for s in c['services']:
-                if s['type'] == 'HBASE':
-                    for r in s['roles']:
-                        if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
-
-    for i in hostids:
-        for h in cm['hosts']:
-            if i == h['hostId']: rsnodes.append(h['hostname'])
+        for i in hostids:
+            for h in cm['hosts']:
+                if i == h['hostId']: rsnodes.append(h['hostname'])
+    elif 'HDP' in distro:
+        if not '2.3' in distro:
+            log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+        # get list of HBase RegionServer nodes in HDP
+        hdp = hg.get_content('%s/api/v1/clusters/%s/services/HBASE/components/HBASE_REGIONSERVER' % (cfgs['mgr_url'], cluster_name ))
+        rsnodes = [ c['HostRoles']['host_name'] for c in hdp['host_components'] ]
 
     rsnodes.sort()
     # use short hostname
