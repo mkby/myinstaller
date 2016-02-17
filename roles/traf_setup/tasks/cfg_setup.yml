@@ -65,6 +65,7 @@
 
 - name: Modify dcs master file
   lineinfile: dest={{ dcs_master_file }} line={{ groups['firstnode'][0] }}
+  become: yes
 
 - name: Modify dcs-env.sh
   replace: dest={{ dcs_env_file }} regexp='# export DCS_MANAGES_ZK=true' replace='export DCS_MANAGES_ZK=false'
