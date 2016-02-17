@@ -53,6 +53,7 @@
     interface: "{{ net_interface.stdout }}"
     zk_hosts: "{{ zookeeper_quorum.stdout }}"
     dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/servers"
+    dcs_master_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/master"
     dcs_bkmaster_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/backup-masters"
     dcs_env_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-env.sh"
     dcs_site_file: "{{ sq_root }}/dcs-{{ traf_ver }}/conf/dcs-site.xml"
@@ -61,6 +62,9 @@
 - set_fact:
     dcs_backup_nodes: "{{ dcs_bknodes.split() }}"
   when: dcs_bknodes is defined
+
+- name: Modify dcs master file
+  lineinfile: dest={{ dcs_master_file }} line={{ groups['firstnode'][0] }}
 
 - name: Modify dcs-env.sh
   replace: dest={{ dcs_env_file }} regexp='# export DCS_MANAGES_ZK=true' replace='export DCS_MANAGES_ZK=false'
