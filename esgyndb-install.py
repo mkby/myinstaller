@@ -430,6 +430,7 @@ def user_input(no_dbmgr=False):
 
         if not '5.4' in fullversion:
             log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+        cfgs['distro'] = fullversion
 
         # get list of HBase RegionServer nodes in CDH
         hostids = []
@@ -447,6 +448,8 @@ def user_input(no_dbmgr=False):
     elif 'HDP' in distro:
         if not '2.3' in distro:
             log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+        cfgs['distro'] = distro
+
         # get list of HBase RegionServer nodes in HDP
         hdp = hg.get_content('%s/api/v1/clusters/%s/services/HBASE/components/HBASE_REGIONSERVER' % (cfgs['mgr_url'], cluster_name ))
         rsnodes = [ c['HostRoles']['host_name'] for c in hdp['host_components'] ]

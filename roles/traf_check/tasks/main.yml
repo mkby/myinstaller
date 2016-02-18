@@ -5,18 +5,19 @@
   command: "echo"
   become: yes
 
-#- name: Check HBase version
-
 - name: Check hbase-site.xml existence
   stat: path={{ hbase_xml_file }}
   register: hbase_xml
   failed_when: hbase_xml.stat.exists==False
 
+- name: Check JAVA_HOME
+  stat: path={{ java_home }}
+  register: java_status
+
 - name: Check JDK version
   shell: "{{ java_home }}/bin/javac -version 2>&1|grep -o '[0-9]\\.[0-9]'"
   register: javac_ver
-  failed_when: javac_ver.stdout!='1.7'
-
+  failed_when: java_status.stat.exists==False or javac_ver.stdout!='1.7'
 
 - name: Check Hardware Platform should be x86_64
   command: "uname -i"

@@ -1,9 +1,9 @@
 # modify Cloudera services config
-- name: Detect ansible version 
+- name: CDH - Detect ansible version 
   shell: "ansible-playbook --version|grep ansible-playbook |awk '{print $2}'"
   register: ansible_ver
 
-- name: Set hadoop config json file name - 1
+- name: CDH - Set hadoop config json file name - 1
   set_fact:
     hdfs_conf: hdfs_config.json
     hbase_master_conf: hbase_master_config.json
@@ -11,7 +11,7 @@
     zk_conf: zookeeper_config.json
     version_flag: "{{ ansible_ver.stdout | version_compare('2.0', operator='gt') }}"
 
-- name: Set hadoop config json file name - 2
+- name: CDH - Set hadoop config json file name - 2
   set_fact:
     hdfs_conf: hdfs_config2.json
     hbase_master_conf: hbase_master_config2.json
@@ -19,7 +19,7 @@
     zk_conf: zookeeper_config2.json
   when: version_flag == True
 
-- name: Change HDFS config using Cloudera REST api
+- name: CDH - Change HDFS config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hdfs/config
        method=PUT
        HEADER_Content-Type="application/json"
@@ -29,7 +29,7 @@
        body="{{ lookup('file', hdfs_conf) }}"
   register: hdfs_config_result
 
-- name: Change HBase master config using Cloudera REST api
+- name: CDH - Change HBase master config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hbase/config
        method=PUT
        HEADER_Content-Type="application/json"
@@ -42,7 +42,7 @@
 - set_fact:
     rs_grpurl: "{{ mgr_url }}/api/v6/clusters/{{ cluster_name }}/services/hbase/roleConfigGroups"
 
-- name: Get Hbase role config groups
+- name: CDH - Get Hbase role config groups
   uri: url={{ rs_grpurl }}
        method=GET
        user={{ mgr_user }}
@@ -51,18 +51,18 @@
   register: rcg
 
 # get all region server groups
-- name: Get all Region Server groups
+- name: CDH - Get all Region Server groups
   set_fact:
     rs_grpname:  "{% for i in rcg.json['items'] %} 
                     {% if i.roleType=='REGIONSERVER' %}  {{ i.name }} {% endif %}
                   {% endfor %}"
 
-- name: Get Region Server groups list
+- name: CDH - Get Region Server groups list
   set_fact:
     rs_grplist: "{{ rs_grpname.split() }}"
 
 # modify configs on all regionserver groups
-- name: Change HBase regionserver config using Cloudera REST api
+- name: CDH - Change HBase regionserver config using Cloudera REST api
   uri: url={{ rs_grpurl }}/{{ item }}/config
        method=PUT
        HEADER_Content-Type="application/json"
@@ -73,7 +73,7 @@
   with_items: rs_grplist
   register: hbase_rs_config_result
 
-- name: Change ZooKeeper config using Cloudera REST api
+- name: CDH - Change ZooKeeper config using Cloudera REST api
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/zookeeper/config
        method=PUT
        HEADER_Content-Type="application/json"

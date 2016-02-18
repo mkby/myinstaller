@@ -1,0 +1,3 @@
+---
+- name: HDP - Change Hadoop configs using Ambari REST api
+  script: "modify_hdp.py {{ mgr_user }} {{ mgrpwd }} {{ mgr_url + '/api/v1/clusters/' + cluster_name }}"
