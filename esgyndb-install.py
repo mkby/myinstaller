@@ -17,6 +17,7 @@ import time
 from optparse import OptionParser
 from glob import glob
 from collections import defaultdict
+from prettytable import PrettyTable
 
 # init global cfgs for user input
 cfgs = defaultdict(str)
@@ -227,10 +228,16 @@ class UserInput:
                 'default':'Y',
                 'isYN':True
             },
-            'confirm':
+            'confirm_nodelist':
             {
                 'prompt':'Confirm expanded node list is correct',
                 'default':'Y',
+                'isYN':True
+            },
+            'confirm_all':
+            {
+                'prompt':'Confirm all configs are correct',
+                'default':'N',
                 'isYN':True
             },
         }
@@ -261,7 +268,12 @@ class UserInput:
     
         # no default value for password
         if ispasswd:
-            answer = base64.b64encode(getpass.getpass(prompt))
+            orig = getpass.getpass(prompt)
+            confirm = getpass.getpass('Confirm ' + prompt)
+            if orig == confirm: 
+                answer = base64.b64encode(confirm)
+            else:
+                log_err('Password mismatch')
         else:
             answer = raw_input(prompt)
             if not answer and default: answer = default
@@ -293,7 +305,7 @@ class UserInput:
         
         return answer
     
-    def getinput(self, name, userdef):
+    def getinput(self, name, userdef=''):
         if self.in_data.has_key(name):
             # save configs to global dict
             cfgs[name] = self._handle_input(self.in_data[name], userdef)
@@ -430,7 +442,7 @@ def user_input(no_dbmgr=False):
 
         if not '5.4' in fullversion:
             log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
-        cfgs['distro'] = fullversion
+        cfgs['distro'] = 'CDH' + fullversion
 
         # get list of HBase RegionServer nodes in CDH
         hostids = []
@@ -470,7 +482,7 @@ def user_input(no_dbmgr=False):
             if cnt == 2: print ' === Please try to input node list again ==='
             node_list = ' '.join(expNumRe(g('node_list')))
             print ' === NODE LIST ===\n' + node_list
-            confirm = u.getinput('confirm', '')
+            confirm = u.getinput('confirm_nodelist')
             if confirm == 'N': 
                 if cnt <= 1:
                     continue
@@ -483,7 +495,6 @@ def user_input(no_dbmgr=False):
         cfgs['node_list'] = ' ' + ' '.join(rsnodes)
 
     check_node_conn()
-
 
     # set other config to cfgs
     cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
@@ -529,8 +540,22 @@ def user_input(no_dbmgr=False):
         if sorted(list(set((cfgs['dcs_bknodes'] + ' ' + cfgs['node_list']).split()))) != sorted(cfgs['node_list'].split()):
             log_err('Invalid DCS backup nodes, please pick up from node list')
 
-# set time format from seconds to h:m:s
+    # show the final configs to user
+    print '\n  **** Final Configs ****'
+    pt = PrettyTable(['config type', 'value'])
+    pt.align['config type'] = 'l'
+    pt.align['value'] = 'l'
+    for k,v in sorted(cfgs.items()):
+        if u.in_data.has_key(k):
+            if u.in_data[k].has_key('ispasswd') or 'confirm' in k: continue
+            pt.add_row([k, v])
+    print pt
+    confirm = u.getinput('confirm_all')
+    if confirm == 'N': log_err('User quit')
+
+    
 def time_elapse(start, end):
+    """ set time format from seconds to h:m:s """
     seconds = end - start
     hours = seconds / 3600
     seconds = seconds % 3600
@@ -619,7 +644,6 @@ def main():
     if options.dryrun or (not os.path.exists(config_file)): 
         if options.dryrun: format_output('DryRun Start')
         user_input(no_dbmgr)
-        
 
         # save config file as json format
         print '\n** Generating json file to save configs ... \n'
