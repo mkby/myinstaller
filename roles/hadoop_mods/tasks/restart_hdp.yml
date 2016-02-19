@@ -12,7 +12,7 @@
     - ZOOKEEPER
     - HDFS
 
-- name: HDP - "Check Hadoop services are stopped (timeout: 5mins)"
+- name: "HDP - Check Hadoop services are stopped (timeout: 5mins)"
   shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' {{ serv_url }}/{{ item }}"
   register: stop_status
   until: stop_status.stdout.find('INSTALLED') != -1
@@ -31,7 +31,7 @@
   shell: "echo {{ start_result.stdout_lines }} |awk '{print $4}'|sed -r s'#\\\"(.*)\\\".*#\\1#g'"
   register: cmd_url
 
-- name: HDP - "Check Hadoop services are started (timeout: 10mins)"
+- name: "HDP - Check Hadoop services are started (timeout: 10mins)"
   shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' {{ cmd_url.stdout }}"
   register: start_status
   until: start_status.stdout.find('COMPLETED') != -1
