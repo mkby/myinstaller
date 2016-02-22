@@ -1,6 +1,6 @@
-- name: Set CPU core number
-  set_fact:
-    cpu_core: "{% if ansible_processor_vcpus > 16 %}15{% else %}{{ ansible_processor_vcpus -1 }}{% endif %}"
+#- name: Set CPU core number
+#  set_fact:
+#    cpu_core: "{% if ansible_processor_vcpus > 16 %}15{% else %}{{ ansible_processor_vcpus -1 }}{% endif %}"
 
 - name: Create sqconfig for trafodion instance
   script:  traf_sqconfig {{cpu_core}} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
@@ -22,7 +22,7 @@
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion;\" | sqlci'
   become: yes
   become_user: trafodion
-  when: traf_init=='Y' and traf_start=='Y'
+  when: traf_start=='Y'
 
 - name: Initialize trafodion - upgrade
   shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion, upgrade;\" | sqlci'
