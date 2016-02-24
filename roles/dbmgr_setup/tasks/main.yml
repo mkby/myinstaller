@@ -129,7 +129,7 @@
   become: yes
 
 - name: Registering Metrics
-  shell: "source /home/trafodion/.bashrc; {{ mgblty_install_dir }}/opentsdb/tools/register_metrics.sh"
+  shell: "source /home/trafodion/.bashrc; {{ mgblty_install_dir }}/opentsdb/tools/registerMetrics.py"
   become_user: trafodion
   become: yes
   when: inventory_hostname in groups['firstnode']
