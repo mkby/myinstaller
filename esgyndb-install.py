@@ -56,23 +56,84 @@ class HttpGet:
         self.h = httplib2.Http(disable_ssl_certificate_validation=True)  
         self.h.add_credentials(self.user, self.passwd)
         self.headers = {}
+        self.headers['X-Requested-By'] = 'trafodion'
+        self.headers['Content-Type'] = 'application/json'
+        self.headers['Authorization'] = 'Basic %s' % (base64.b64encode('%s:%s' % (self.user, self.passwd)))
 
-    def get_content(self, url, force_auth=True, test=False):
+    def get_content(self, url):
         self.url = url
         try:
-            if force_auth:
-                self.headers["Authorization"] = "Basic %s" % (base64.b64encode("%s:%s" % (self.user, self.passwd)))
-            resp, content = self.h.request(self.url, "GET", headers=self.headers)  
+            resp, content = self.h.request(self.url, 'GET', headers=self.headers)  
         except:
             log_err('Failed to access manager URL ' + url)
 
-        if not test:
-            try:
-                return defaultdict(str, json.loads(content))
-            except ValueError:
-                #log_err('No json format found in http content')
-                log_err('Failed to get data from manager URL, check if password is correct')
+        try:
+            return defaultdict(str, json.loads(content))
+        except ValueError:
+            log_err('Failed to get data from manager URL, check if password is correct')
             
+
+class HadoopDiscover:
+    ''' discover for hadoop related info '''
+    def __init__(self, distro, cluster_name):
+        self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
+        self.distro = distro
+        self.cluster_name = cluster_name
+        self.rsnodes = []
+        self.users = {}
+
+    def get_hadoop_users(self):
+        pass
+
+    def _get_hdp_users(self):
+        desired_cfg = self.hg.get_content('%s?fields=Clusters/desired_configs' % cfgs['mgr_url'])
+        config_type = {'hbase-env':'hbase_user', 'hdfs-env':'hdfs_user'}
+        for k,v in config_type.items():
+            desired_tag = desired_cfg['Clusters']['desired_configs'][k]['tag']
+            current_cfg = self.hg.get_content('%s/configurations?type=%s&tag=%s' % (cfgs['mgr_url'], c, desired_tag))
+            self.users[v] = current_cfg['items'][0]['properties'][v]
+
+    def _get_cdh_users(self):
+        pass
+
+    def get_rsnodes(self):
+        if 'CDH' in self.distro:
+            if not '5.4.' in self.distro:
+                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+            self._get_rsnodes_cdh()
+        elif 'HDP' in self.distro:
+            if not '2.3' in self.distro:
+                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+            self._get_rsnodes_hdp()
+
+        self.rsnodes.sort()
+        # use short hostname
+        try:
+            self.rsnodes = [re.match(r'([\w\-]+).*',n).group(1) for n in self.rsnodes]
+        except AttributeError:
+            pass
+        return self.rsnodes
+
+    def _get_rsnodes_cdh(self):
+        ''' get list of HBase RegionServer nodes in CDH '''
+        cm = self.hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+
+        hostids = []
+        for c in cm['clusters']:
+            if c['displayName'] == self.cluster_name:
+                for s in c['services']:
+                    if s['type'] == 'HBASE':
+                        for r in s['roles']:
+                            if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
+        for i in hostids:
+            for h in cm['hosts']:
+                if i == h['hostId']: self.rsnodes.append(h['hostname'])
+
+    def _get_rsnodes_hdp(self):
+        ''' get list of HBase RegionServer nodes in HDP '''
+        hdp = self.hg.get_content('%s/api/v1/clusters/%s/services/HBASE/components/HBASE_REGIONSERVER' % (cfgs['mgr_url'], self.cluster_name ))
+        self.rsnodes = [ c['HostRoles']['host_name'] for c in hdp['host_components'] ]
+        
 
 class UserInput:
     def __init__(self):
@@ -222,6 +283,12 @@ class UserInput:
             {
                 'prompt':'Enter list of Nodes separated by space, support simple numeric RE,\n e.g. \'n[01-12] n[21-25]\',\'n0[1-5].com\''
             },
+            'cluster_num':
+            {
+                'prompt':'Select the above cluster number for installing esgynDB',
+                'default':'1',
+                'isdigit':True
+            },
             'use_hbase_node':
             {
                 'prompt':'Use same Trafodion nodes as HBase RegionServer nodes',
@@ -241,7 +308,6 @@ class UserInput:
                 'isYN':True
             },
         }
-    
     
     def _handle_input(self, args, userdef):
         prompt = args['prompt']
@@ -305,7 +371,7 @@ class UserInput:
         
         return answer
     
-    def getinput(self, name, userdef=''):
+    def get_input(self, name, userdef=''):
         if self.in_data.has_key(name):
             # save configs to global dict
             cfgs[name] = self._handle_input(self.in_data[name], userdef)
@@ -313,6 +379,20 @@ class UserInput:
         else: 
             # should not go to here, just in case
             log_err('Invalid prompt')
+
+    def notify_user(self):
+        ''' show the final configs to user '''
+        print '\n  **** Final Configs ****'
+        pt = PrettyTable(['config type', 'value'])
+        pt.align['config type'] = 'l'
+        pt.align['value'] = 'l'
+        for k,v in sorted(cfgs.items()):
+            if self.in_data.has_key(k):
+                if self.in_data[k].has_key('ispasswd') or 'confirm' in k: continue
+                pt.add_row([k, v])
+        print pt
+        confirm = self.get_input('confirm_all')
+        if confirm == 'N': log_err('User quit')
 
 
 def expNumRe(text):
@@ -363,29 +443,35 @@ def check_node_conn():
         if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
 
 def check_mgr_url():
-    # validate url, will not validate user/passwd here
     hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
-    validate_url = '%s/api/v1/clusters' % cfgs['mgr_url']
-    content = hg.get_content(validate_url)
+    validate_url_v1 = '%s/api/v1/clusters' % cfgs['mgr_url']
+    validate_url_v6 = '%s/api/v6/clusters' % cfgs['mgr_url']
+    content = hg.get_content(validate_url_v1)
 
-    # assume only one cluster being managed
-    try:
-        # HDP
-        distro = content['items'][0]['Clusters']['version']
-        cluster_name = content['items'][0]['Clusters']['cluster_name']
-    except KeyError:
-        # CDH
+    if content['items'][0].has_key('name'):
+        # use v6 rest api for CDH to get fullversion
+        content = hg.get_content(validate_url_v6)
+
+    cluster_cfgs = []
+    # loop all managed clusters
+    for clusters in content['items']:
         try:
-            distro = content['items'][0]['version']
-            cluster_name = content['items'][0]['name']
+            # HDP
+            distro = clusters['Clusters']['version']
+            cluster_name = clusters['Clusters']['cluster_name']
         except KeyError:
-            distro = cluster_name = ''
+            # CDH
+            try:
+                distro = 'CDH' + clusters['fullVersion']
+                cluster_name = clusters['displayName']
+            except KeyError:
+                distro = cluster_name = ''
 
-    if not ('CDH' in distro or 'HDP' in distro):
-        log_err('Cannot detect Cloudera/Hortonworks, currently EsgynDB only supports CDH/HDP')
+        cluster_cfgs.append([distro, cluster_name])
 
-    return [distro, cluster_name, hg]
+    return cluster_cfgs
 
+    
 def user_input(no_dbmgr=False):
     """ get user's input and check input value """
     global cfgs, tmp_file, installer_loc
@@ -395,14 +481,14 @@ def user_input(no_dbmgr=False):
         cfgs = tp.jload()
 
     u = UserInput()
-    g = lambda n: u.getinput(n, cfgs[n])
+    g = lambda n: u.get_input(n, cfgs[n])
 
     g('java_home')
     # find trafodion rpm in installer folder, if more than one
     # rpm found, use the first one
     def_rpm = glob('%s/trafodion*.rpm' % installer_loc)
     if def_rpm:
-        u.getinput('traf_rpm', def_rpm[0])
+        u.get_input('traf_rpm', def_rpm[0])
     else:
         g('traf_rpm')
 
@@ -418,7 +504,7 @@ def user_input(no_dbmgr=False):
         # we don't get dbmgr rpm name from filename because dbmgr has uniq rpm name
         dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
         if dbmgr_rpm:
-            u.getinput('dbmgr_rpm', dbmgr_rpm[0])
+            u.get_input('dbmgr_rpm', dbmgr_rpm[0])
         else:
             g('dbmgr_rpm')
         g('db_admin_user')
@@ -431,47 +517,21 @@ def user_input(no_dbmgr=False):
     g('mgr_user')
     g('mgr_pwd')
 
-    distro, cluster_name, hg = check_mgr_url()
-    if 'CDH' in distro:
-        cm = hg.get_content('%s/api/v6/cm/deployment' % cfgs['mgr_url'])
+    cluster_cfgs = check_mgr_url()
+    c_index = 0
+    # support multiple clusters
+    if len(cluster_cfgs) > 1:
+        for index, config in enumerate(cluster_cfgs):
+            print str(index + 1) + '. ' + config[1]
+        c_index = int(g('cluster_num')) - 1
+        if c_index < 0 or c_index >= len(cluster_cfgs):
+            log_err('Incorrect number')
 
-        # get cluster info, assume only one cluster being managed
-        #cluster_name = cm['clusters'][0]['displayName']
-        cluster_version = cm['clusters'][0]['version']
-        fullversion = cm['clusters'][0]['fullVersion']
+    distro, cluster_name = cluster_cfgs[c_index]
 
-        if not '5.4' in fullversion:
-            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
-        cfgs['distro'] = 'CDH' + fullversion
-
-        # get list of HBase RegionServer nodes in CDH
-        hostids = []
-        rsnodes = []
-        for c in cm['clusters']:
-            if c['displayName'] == cluster_name:
-                for s in c['services']:
-                    if s['type'] == 'HBASE':
-                        for r in s['roles']:
-                            if r['type'] == 'REGIONSERVER': hostids.append(r['hostRef']['hostId'])
-
-        for i in hostids:
-            for h in cm['hosts']:
-                if i == h['hostId']: rsnodes.append(h['hostname'])
-    elif 'HDP' in distro:
-        if not '2.3' in distro:
-            log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
-        cfgs['distro'] = distro
-
-        # get list of HBase RegionServer nodes in HDP
-        hdp = hg.get_content('%s/api/v1/clusters/%s/services/HBASE/components/HBASE_REGIONSERVER' % (cfgs['mgr_url'], cluster_name ))
-        rsnodes = [ c['HostRoles']['host_name'] for c in hdp['host_components'] ]
-
-    rsnodes.sort()
-    # use short hostname
-    try:
-        rsnodes = [re.match(r'([\w\-]+).*',n).group(1) for n in rsnodes]
-    except AttributeError:
-        pass
+    cfgs['distro'] = distro
+    discover = HadoopDiscover(distro, cluster_name)
+    rsnodes = discover.get_rsnodes()
 
     # manually set node list
     if  g('use_hbase_node') == 'N':
@@ -482,7 +542,7 @@ def user_input(no_dbmgr=False):
             if cnt == 2: print ' === Please try to input node list again ==='
             node_list = ' '.join(expNumRe(g('node_list')))
             print ' === NODE LIST ===\n' + node_list
-            confirm = u.getinput('confirm_nodelist')
+            confirm = u.get_input('confirm_nodelist')
             if confirm == 'N': 
                 if cnt <= 1:
                     continue
@@ -540,20 +600,8 @@ def user_input(no_dbmgr=False):
         if sorted(list(set((cfgs['dcs_bknodes'] + ' ' + cfgs['node_list']).split()))) != sorted(cfgs['node_list'].split()):
             log_err('Invalid DCS backup nodes, please pick up from node list')
 
-    # show the final configs to user
-    print '\n  **** Final Configs ****'
-    pt = PrettyTable(['config type', 'value'])
-    pt.align['config type'] = 'l'
-    pt.align['value'] = 'l'
-    for k,v in sorted(cfgs.items()):
-        if u.in_data.has_key(k):
-            if u.in_data[k].has_key('ispasswd') or 'confirm' in k: continue
-            pt.add_row([k, v])
-    print pt
-    confirm = u.getinput('confirm_all')
-    if confirm == 'N': log_err('User quit')
+    u.notify_user()
 
-    
 def time_elapse(start, end):
     """ set time format from seconds to h:m:s """
     seconds = end - start
@@ -590,7 +638,7 @@ def main():
                 help="Specify ssh login user for remote server, \
                       if not provided, use current login user as default.")
     parser.add_option("-b", "--become-method", dest="method", metavar="METHOD",
-                help="Specify become method for ansible.")
+                help="Specify become root method for ansible [ sudo | su | pbrun | pfexec | runas | doas ].")
     parser.add_option("-f", "--fork", dest="fork", metavar="FORK",
                 help="Specify number of parallel processes to use for ansible(default=5)" )
     parser.add_option("-d", "--disable-pass", action="store_true", dest="dispass", default=False,
@@ -612,9 +660,14 @@ def main():
     # handle parser option
     if options.dbmgr and options.nodbmgr:
         log_err('Wrong parameter, cannot specify both --dbmgr-only and --no-dbmgr')
+
     if bool(options.dbmgr) != bool(options.dbmgrrpm):
         log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
 
+    if options.method:
+        if options.method not in ['sudo','su','pbrun','pfexec','runas','doas']:
+            log_err('Wrong method, valid methods: [ sudo | su | pbrun | pfexec | runas | doas ].')
+        
     # set no_dbmgr flag
     if options.nodbmgr:
         no_dbmgr = True
@@ -657,6 +710,9 @@ def main():
         # check some basic info
         check_mgr_url()
         check_node_conn()
+
+        u = UserInput()
+        u.notify_user()
 
     if not options.dryrun:
         #####################################

@@ -16,13 +16,13 @@
   when: traf_start=='Y'
 
 - name: Initialize trafodion
-  shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion;\" | sqlci'
+  shell: 'source /home/trafodion/.bashrc; echo "initialize trafodion;" | sqlci'
   become: yes
   become_user: trafodion
   when: traf_start=='Y'
 
 - name: Initialize trafodion - upgrade
-  shell: 'source /home/trafodion/.bashrc; echo \"initialize trafodion, upgrade;\" | sqlci'
+  shell: 'source /home/trafodion/.bashrc; echo "initialize trafodion, upgrade;" | sqlci'
   become: yes
   become_user: trafodion
   when: traf_init=='N' and traf_start=='Y'

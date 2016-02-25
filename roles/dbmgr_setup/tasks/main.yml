@@ -45,6 +45,7 @@
 - name: Set mgblty and dbmgr install directory
   set_fact:
     mgblty_install_dir: "{{ dbmgr_loc.stdout }}"
+    mgblty_tools_dir: "{{ dbmgr_loc.stdout }}/opentsdb/tools"
     dbmgr_install_dir: "{{ dbmgr_loc.stdout }}"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
@@ -71,7 +72,7 @@
 # This script will use hbase shell, so it should be better to run on regionserver node
 # But esgyndb manager will be installed on the same node as Trafodion, so we have to run it on first trafodion node
 - name: Create OpenTSDB tables
-  shell: "export HBASE_HOME=/usr; export COMPRESSION=GZ; {{ mgblty_install_dir }}/opentsdb/tools/create_table.sh"
+  shell: "export HBASE_HOME=/usr; export COMPRESSION=GZ; {{ mgblty_tools_dir }}/create_table.sh"
   become_user: trafodion
   become: yes
   when: inventory_hostname in groups['firstnode']
@@ -129,7 +130,7 @@
   become: yes
 
 - name: Registering Metrics
-  shell: "source /home/trafodion/.bashrc; {{ mgblty_install_dir }}/opentsdb/tools/registerMetrics.py"
+  shell: "source /home/trafodion/.bashrc; if [[ -f {{ mgblty_tools_dir }}/registerMetrics.py ]]; then python {{ mgblty_tools_dir }}/registerMetrics.py; else {{ mgblty_tools_dir }}/register_metrics.sh; fi"
   become_user: trafodion
   become: yes
   when: inventory_hostname in groups['firstnode']
