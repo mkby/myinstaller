@@ -22,8 +22,8 @@ from prettytable import PrettyTable
 # init global cfgs for user input
 cfgs = defaultdict(str)
 
-tmp_file = '/tmp/esgyndb_config_temp'
 installer_loc = sys.path[0]
+tmp_file = installer_loc + '/.esgyndb_config_temp'
 
 class ParseJson:
     """ 
@@ -83,18 +83,22 @@ class HadoopDiscover:
         self.users = {}
 
     def get_hadoop_users(self):
-        pass
+        if 'CDH' in self.distro:
+            self._get_cdh_users()
+        elif 'HDP' in self.distro:
+            self._get_hdp_users()
+        return self.users
 
     def _get_hdp_users(self):
-        desired_cfg = self.hg.get_content('%s?fields=Clusters/desired_configs' % cfgs['mgr_url'])
-        config_type = {'hbase-env':'hbase_user', 'hdfs-env':'hdfs_user'}
+        desired_cfg = self.hg.get_content('%s/api/v1/clusters/%s?fields=Clusters/desired_configs' % (cfgs['mgr_url'], self.cluster_name))
+        config_type = {'hbase-env':'hbase_user', 'hadoop-env':'hdfs_user'}
         for k,v in config_type.items():
             desired_tag = desired_cfg['Clusters']['desired_configs'][k]['tag']
-            current_cfg = self.hg.get_content('%s/configurations?type=%s&tag=%s' % (cfgs['mgr_url'], c, desired_tag))
+            current_cfg = self.hg.get_content('%s/api/v1/clusters/%s/configurations?type=%s&tag=%s' % (cfgs['mgr_url'], self.cluster_name, k, desired_tag))
             self.users[v] = current_cfg['items'][0]['properties'][v]
 
     def _get_cdh_users(self):
-        pass
+        self.users = {'hbase_user':'hbase', 'hdfs_user':'hdfs'}
 
     def get_rsnodes(self):
         if 'CDH' in self.distro:
@@ -155,11 +159,6 @@ class UserInput:
                 'prompt':'Enter hbase user name',
                 'default':'hbase',
                 'isuser': True
-            },
-            'hbase_group':
-            {
-                'prompt':'Enter hbase group name',
-                'default':'hbase'
             },
             'dcs_ha':
             {
@@ -533,6 +532,10 @@ def user_input(no_dbmgr=False):
     discover = HadoopDiscover(distro, cluster_name)
     rsnodes = discover.get_rsnodes()
 
+    hadoop_users = discover.get_hadoop_users()
+    cfgs['hdfs_user'] = hadoop_users['hdfs_user']
+    cfgs['hbase_user'] = hadoop_users['hbase_user']
+
     # manually set node list
     if  g('use_hbase_node') == 'N':
         cnt = 0
@@ -566,9 +569,6 @@ def user_input(no_dbmgr=False):
     
     g('traf_pwd')
     g('traf_start')
-    g('hdfs_user')
-    g('hbase_user')
-    g('hbase_group')
     g('dcs_cnt_per_node')
 
     # ldap security
