@@ -82,6 +82,7 @@ class HadoopDiscover:
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.distro = distro
         self.cluster_name = cluster_name
+        self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name)
         self.rsnodes = []
         self.users = {}
 
@@ -93,26 +94,32 @@ class HadoopDiscover:
         return self.users
 
     def _get_hdp_users(self):
-        desired_cfg = self.hg.get_content('%s/api/v1/clusters/%s?fields=Clusters/desired_configs' % (cfgs['mgr_url'], self.cluster_name))
+        desired_cfg = self.hg.get_content('%s/?fields=Clusters/desired_configs' % (self.cluster_url))
         config_type = {'hbase-env':'hbase_user', 'hadoop-env':'hdfs_user'}
         for k,v in config_type.items():
             desired_tag = desired_cfg['Clusters']['desired_configs'][k]['tag']
-            current_cfg = self.hg.get_content('%s/api/v1/clusters/%s/configurations?type=%s&tag=%s' % (cfgs['mgr_url'], self.cluster_name, k, desired_tag))
+            current_cfg = self.hg.get_content('%s/configurations?type=%s&tag=%s' % (self.cluster_url, k, desired_tag))
             self.users[v] = current_cfg['items'][0]['properties'][v]
 
     def _get_cdh_users(self):
-        #%s/api/v1/clusters/%s/services/hdfs/config
-        #%s/api/v1/clusters/%s/services/hbase/config
-        self.users = {'hbase_user':'hbase', 'hdfs_user':'hdfs'}
+        def _get_username(hadoop_type):
+            cfg = self.hg.get_content('%s/services/%s/config' % self.cluster_url, hadoop_type)
+            if cfg.has_key('items'):
+                for item in cfg['items']:
+                    if item['name'] == 'process_username': 
+                        return item['value']
+            return hadoop_type
+        hdfs_user = _get_username('hdfs')
+        hbase_user = _get_username('hbase')
+
+        self.users = {'hbase_user':hbase_user, 'hdfs_user':hdfs_user}
 
     def get_rsnodes(self):
-        if 'CDH' in self.distro:
-            if not '5.4.' in self.distro:
-                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+        if 'CDH' in self.distro and not '5.4.' in self.distro:
+            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
             self._get_rsnodes_cdh()
-        elif 'HDP' in self.distro:
-            if not '2.3' in self.distro:
-                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+        elif 'HDP' in self.distro and not '2.3' in self.distro:
+            log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
             self._get_rsnodes_hdp()
 
         self.rsnodes.sort()
@@ -140,7 +147,7 @@ class HadoopDiscover:
 
     def _get_rsnodes_hdp(self):
         ''' get list of HBase RegionServer nodes in HDP '''
-        hdp = self.hg.get_content('%s/api/v1/clusters/%s/services/HBASE/components/HBASE_REGIONSERVER' % (cfgs['mgr_url'], self.cluster_name ))
+        hdp = self.hg.get_content('%s/services/HBASE/components/HBASE_REGIONSERVER' % self.cluster_url )
         self.rsnodes = [ c['HostRoles']['host_name'] for c in hdp['host_components'] ]
         
 
