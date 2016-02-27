@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+# -*- coding: utf8 -*- 
 
 import sys
+reload(sys)
+sys.setdefaultencoding("utf-8")
 import os
 import re
 import socket
@@ -64,7 +67,7 @@ class HttpGet:
         self.url = url
         try:
             resp, content = self.h.request(self.url, 'GET', headers=self.headers)  
-        except:
+        except Exception:
             log_err('Failed to access manager URL ' + url)
 
         try:
@@ -98,6 +101,8 @@ class HadoopDiscover:
             self.users[v] = current_cfg['items'][0]['properties'][v]
 
     def _get_cdh_users(self):
+        #%s/api/v1/clusters/%s/services/hdfs/config
+        #%s/api/v1/clusters/%s/services/hbase/config
         self.users = {'hbase_user':'hbase', 'hdfs_user':'hdfs'}
 
     def get_rsnodes(self):
@@ -340,7 +345,10 @@ class UserInput:
             else:
                 log_err('Password mismatch')
         else:
-            answer = raw_input(prompt)
+            try:
+                answer = raw_input(prompt)
+            except UnicodeEncodeError:
+                log_err('Character Encode error, check user input')
             if not answer and default: answer = default
     
         # check answer value basicly
@@ -658,6 +666,9 @@ def main():
     (options, args) = parser.parse_args()
 
     # handle parser option
+    if options.dryrun and options.cfgfile:
+        log_err('Wrong parameter, cannot specify both --dryrun and --config-file')
+
     if options.dbmgr and options.nodbmgr:
         log_err('Wrong parameter, cannot specify both --dbmgr-only and --no-dbmgr')
 
@@ -801,12 +812,11 @@ def main():
                 os.rename(config_file, config_file + '.bak' + ts)
         except OSError:
             log_err('Cannot rename config file')
-
-        # remove temp config file
-        if os.path.exists(tmp_file): os.remove(tmp_file)
-    
     else:
         format_output('DryRun Complete')
+
+    # remove temp config file
+    if os.path.exists(tmp_file): os.remove(tmp_file)
 
 if __name__ == "__main__":
     try:
