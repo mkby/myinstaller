@@ -67,6 +67,8 @@ class HttpGet:
         self.url = url
         try:
             resp, content = self.h.request(self.url, 'GET', headers=self.headers)  
+            if resp.status != 200:
+                log_err('Error return code %s when getting configs from manager URL' % resp.status)
         except Exception:
             log_err('Failed to access manager URL ' + url)
 
@@ -103,7 +105,7 @@ class HadoopDiscover:
 
     def _get_cdh_users(self):
         def _get_username(hadoop_type):
-            cfg = self.hg.get_content('%s/services/%s/config' % self.cluster_url, hadoop_type)
+            cfg = self.hg.get_content('%s/services/%s/config' % (self.cluster_url, hadoop_type))
             if cfg.has_key('items'):
                 for item in cfg['items']:
                     if item['name'] == 'process_username': 
@@ -478,6 +480,7 @@ def check_mgr_url():
             try:
                 distro = 'CDH' + clusters['fullVersion']
                 cluster_name = clusters['displayName']
+                cluster_name = cluster_name.replace(' ', '%20')
             except KeyError:
                 distro = cluster_name = ''
 
@@ -542,12 +545,12 @@ def user_input(no_dbmgr=False):
             log_err('Incorrect number')
 
     distro, cluster_name = cluster_cfgs[c_index]
-
-    cfgs['distro'] = distro
     discover = HadoopDiscover(distro, cluster_name)
     rsnodes = discover.get_rsnodes()
-
     hadoop_users = discover.get_hadoop_users()
+
+    cfgs['distro'] = distro
+    cfgs['cluster_name'] = cluster_name
     cfgs['hdfs_user'] = hadoop_users['hdfs_user']
     cfgs['hbase_user'] = hadoop_users['hbase_user']
 
@@ -578,7 +581,6 @@ def user_input(no_dbmgr=False):
     cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
     cfgs['first_node'] = cfgs['node_list'].split()[0]
     cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
-    cfgs['cluster_name'] = cluster_name.replace(' ','%20')
     cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
     cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
     
