@@ -83,7 +83,7 @@ class HadoopDiscover:
     def __init__(self, distro, cluster_name):
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.distro = distro
-        self.cluster_name = cluster_name
+        self.cluster_name = cluster_name.replace('%20', ' ')
         self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name)
         self.rsnodes = []
         self.users = {}
@@ -117,11 +117,13 @@ class HadoopDiscover:
         self.users = {'hbase_user':hbase_user, 'hdfs_user':hdfs_user}
 
     def get_rsnodes(self):
-        if 'CDH' in self.distro and not '5.4.' in self.distro:
-            log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
+        if 'CDH' in self.distro:
+            if not '5.4.' in self.distro:
+                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
             self._get_rsnodes_cdh()
-        elif 'HDP' in self.distro and not '2.3' in self.distro:
-            log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+        elif 'HDP' in self.distro:
+            if not '2.3' in self.distro:
+                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
             self._get_rsnodes_hdp()
 
         self.rsnodes.sort()
