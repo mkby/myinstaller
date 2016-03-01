@@ -306,7 +306,7 @@ class UserInput:
             {
                 'prompt':'Enter list of Nodes separated by space, support simple numeric RE,\n e.g. \'n[01-12] n[21-25]\',\'n0[1-5].com\''
             },
-            'cluster_num':
+            'cluster_no':
             {
                 'prompt':'Select the above cluster number for installing esgynDB',
                 'default':'1',
@@ -511,34 +511,26 @@ def user_input(no_dbmgr=False):
     g = lambda n: u.get_input(n, cfgs[n])
 
     g('java_home')
-    # find trafodion rpm in installer folder, if more than one
-    # rpm found, use the first one
-    traf_rpm = glob('%s/trafodion*.rpm' % installer_loc)
-    if traf_rpm:
-        u.get_input('traf_rpm', traf_rpm[0])
-    else:
-        g('traf_rpm')
 
-    # get rpm basename from rpm filename
-    try:
-        cfgs['rpm_basename'], cfgs['traf_version'] = re.search(r'(trafodion.*)-(\d\.\d\.\d)-.*', cfgs['traf_rpm']).groups()
-    except:
-        log_err('Invalid trafodion RPM name, be careful don\'t rename original RPM name')
+    def _check_rpm(input_name, rpm_name):
+        # find rpm in installer folder, if more than one rpm found, use the first one
+        rpm_loc = glob('%s/%s*.rpm' % (installer_loc, rpm_name))
+        if rpm_loc:
+            u.get_input(input_name, rpm_loc[0])
+        else:
+            g(input_name)
+
+        # get rpm basename from rpm filename
+        try:
+            rpm_basename, rpm_version = re.search(r'(%s.*)-(\d\.\d\.\d)-.*' % rpm_name, cfgs[input_name]).groups()
+            return rpm_basename, rpm_version
+        except:
+            log_err('Invalid %s RPM name, be careful don\'t rename original RPM name' % rpm_name)
+
+    cfgs['traf_basename'], cfgs['traf_version'] = _check_rpm('traf_rpm', 'trafodion')
 
     if not no_dbmgr:
-        # find esgyndb manager rpm in installer folder, if more than one
-        # rpm found, use the first one
-        dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
-        if dbmgr_rpm:
-            u.get_input('dbmgr_rpm', dbmgr_rpm[0])
-        else:
-            g('dbmgr_rpm')
-
-        try:
-            cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = re.search(r'(esgynDB-manager.*)-(\d\.\d\.\d)-.*', cfgs['dbmgr_rpm']).groups()
-        except:
-            log_err('Invalid esgynDB manager RPM name, be careful don\'t rename original RPM name')
-
+        cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', 'esgynDB-manager')
         g('db_admin_user')
         g('db_admin_pwd')
 
@@ -555,7 +547,7 @@ def user_input(no_dbmgr=False):
     if len(cluster_cfgs) > 1:
         for index, config in enumerate(cluster_cfgs):
             print str(index + 1) + '. ' + config[1]
-        c_index = int(g('cluster_num')) - 1
+        c_index = int(g('cluster_no')) - 1
         if c_index < 0 or c_index >= len(cluster_cfgs):
             log_err('Incorrect number')
 

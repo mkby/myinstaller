@@ -50,7 +50,7 @@
   become: yes
 
 - name: Get RPM location
-  shell: "rpm -ql {{ rpm_basename }}-{{ traf_version }} |head -1"
+  shell: "rpm -ql {{ traf_basename }}-{{ traf_version }} |head -1"
   register: traf_loc
     
 - name: Set sqroot variables

@@ -1,6 +1,6 @@
 ---
 - name: Make sure Trafodion is installed
-  shell: "rpm -qa|grep -q {{ rpm_basename }}"
+  shell: "rpm -qa|grep -q {{ traf_basename }}"
   register: traf_installed
   failed_when: traf_installed.rc==1
 

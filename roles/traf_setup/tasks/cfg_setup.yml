@@ -42,17 +42,17 @@
   when: "'HDP' in distro"
 
 - name: Copy HBase trx jar file to all nodes - CDH
-  shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_version }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }} 2>/dev/null; echo -n"
+  shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
   when: "'CDH' in distro"
 
 - name: Copy HBase trx jar file to all nodes - HDP
-  shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_version }}/export/lib/hbase-trx-hdp* {{ hbase_lib_path }} 2>/dev/null; echo -n"
+  shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-hdp* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
   when: "'HDP' in distro"
 
 - name: Copy trafodion utility jar file to all nodes
-  shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_version }}/export/lib/trafodion-utility* {{ hbase_lib_path }} 2>/dev/null; echo -n"
+  shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/trafodion-utility* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
 
 # dcs

@@ -26,7 +26,7 @@
 
 - name: Check if Trafodion is previously installed
   # force rc=0, don't let it fail
-  shell: "rpm -qa|grep -c {{ rpm_basename }}; echo -n"
+  shell: "rpm -qa|grep -c {{ traf_basename }}; echo -n"
   register: trafinstalled
   become: yes
 
@@ -43,7 +43,7 @@
 
 - name: Stop Trafodion anyway
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
-  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout!='0' and bashrc.stat.exists==True and bashrc_conf.stdout=='1'
+  when: trafinstalled.stdout!='0' and bashrc.stat.exists==True and bashrc_conf.stdout=='1'
   become_user: trafodion
   become: yes
 
