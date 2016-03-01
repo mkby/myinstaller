@@ -20,7 +20,7 @@
   when: version_flag == True
 
 - name: CDH - Change HDFS config using Cloudera REST api
-  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hdfs/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/{{ hdfs_service_name }}/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
@@ -30,7 +30,7 @@
   register: hdfs_config_result
 
 - name: CDH - Change HBase master config using Cloudera REST api
-  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/hbase/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/{{ hbase_service_name }}/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}
@@ -40,7 +40,7 @@
   register: hbase_master_config_result
 
 - set_fact:
-    rs_grpurl: "{{ mgr_url }}/api/v6/clusters/{{ cluster_name }}/services/hbase/roleConfigGroups"
+    rs_grpurl: "{{ mgr_url }}/api/v6/clusters/{{ cluster_name }}/services/{{ hbase_service_name }}/roleConfigGroups"
 
 - name: CDH - Get Hbase role config groups
   uri: url={{ rs_grpurl }}
@@ -74,7 +74,7 @@
   register: hbase_rs_config_result
 
 - name: CDH - Change ZooKeeper config using Cloudera REST api
-  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/zookeeper/config
+  uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/services/{{ zookeeper_service_name }}/config
        method=PUT
        HEADER_Content-Type="application/json"
        user={{ mgr_user }}

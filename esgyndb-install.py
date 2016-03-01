@@ -80,11 +80,12 @@ class HttpGet:
 
 class HadoopDiscover:
     ''' discover for hadoop related info '''
-    def __init__(self, distro, cluster_name):
+    def __init__(self, distro, cluster_name, index):
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.distro = distro
-        self.cluster_name = cluster_name.replace('%20', ' ')
-        self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name)
+        self.index = index
+        self.cluster_name = cluster_name
+        self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name.replace(' ', '%20'))
         self.rsnodes = []
         self.users = {}
 
@@ -104,15 +105,21 @@ class HadoopDiscover:
             self.users[v] = current_cfg['items'][0]['properties'][v]
 
     def _get_cdh_users(self):
-        def _get_username(hadoop_type):
-            cfg = self.hg.get_content('%s/services/%s/config' % (self.cluster_url, hadoop_type))
+        def _get_username(hadoop_type, index):
+            if index == 1:
+                service_name = hadoop_type
+            else:
+                service_name = hadoop_type + str(index)
+
+            cfg = self.hg.get_content('%s/services/%s/config' % (self.cluster_url, service_name))
             if cfg.has_key('items'):
                 for item in cfg['items']:
                     if item['name'] == 'process_username': 
                         return item['value']
             return hadoop_type
-        hdfs_user = _get_username('hdfs')
-        hbase_user = _get_username('hbase')
+
+        hdfs_user = _get_username('hdfs', self.index)
+        hbase_user = _get_username('hbase', self.index)
 
         self.users = {'hbase_user':hbase_user, 'hdfs_user':hdfs_user}
 
@@ -482,7 +489,6 @@ def check_mgr_url():
             try:
                 distro = 'CDH' + clusters['fullVersion']
                 cluster_name = clusters['displayName']
-                cluster_name = cluster_name.replace(' ', '%20')
             except KeyError:
                 distro = cluster_name = ''
 
@@ -547,12 +553,22 @@ def user_input(no_dbmgr=False):
             log_err('Incorrect number')
 
     distro, cluster_name = cluster_cfgs[c_index]
-    discover = HadoopDiscover(distro, cluster_name)
+    discover = HadoopDiscover(distro, cluster_name, c_index+1)
     rsnodes = discover.get_rsnodes()
     hadoop_users = discover.get_hadoop_users()
 
+    # cdh uses different service names in multiple clusters
+    if c_index == 0:
+        cfgs['hbase_service_name'] = 'hbase'
+        cfgs['hdfs_service_name'] = 'hdfs'
+        cfgs['zookeeper_service_name'] = 'zookeeper'
+    else:
+        cfgs['hbase_service_name'] = 'hbase' + str(c_index+1)
+        cfgs['hdfs_service_name'] = 'hdfs' + str(c_index+1)
+        cfgs['zookeeper_service_name'] = 'zookeeper' + str(c_index+1)
+    
     cfgs['distro'] = distro
-    cfgs['cluster_name'] = cluster_name
+    cfgs['cluster_name'] = cluster_name.replace(' ', '%20')
     cfgs['hdfs_user'] = hadoop_users['hdfs_user']
     cfgs['hbase_user'] = hadoop_users['hbase_user']
 
