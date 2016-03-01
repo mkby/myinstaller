@@ -34,18 +34,15 @@
 #  when: ansible_os_family == 'Suse'
 
 - name: Get esgynDB manager RPM install location
-  shell: "rpm -ql esgynDB-manager|head -1"
+  shell: "rpm -ql {{ dbmgr_basename }}-{{ dbmgr_version }}|head -1"
   register: dbmgr_loc
 
-- name: Get RPM version
-  shell: "echo {{ dbmgr_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
-  register: dbmgr_version
-  when: dbmgr_loc|success
 
 - name: Set mgblty and dbmgr install directory
   set_fact:
     mgblty_install_dir: "{{ dbmgr_loc.stdout }}"
     mgblty_tools_dir: "{{ dbmgr_loc.stdout }}/opentsdb/tools"
+    opentsdb_conf_file: "{{ dbmgr_loc.stdout }}/opentsdb/etc/opentsdb/opentsdb.conf"
     dbmgr_install_dir: "{{ dbmgr_loc.stdout }}"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
@@ -99,7 +96,7 @@
   become_user: trafodion
 
 - name: Edit opentsdb.conf for tsd port
-  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+  replace: dest={{ opentsdb_conf_file }}
            regexp='tsd.network.port = .*'
            replace="tsd.network.port = {{ tsd_port }}"
   become_user: trafodion
@@ -112,7 +109,7 @@
   become: yes
 
 - name: Edit opentsdb.conf for time zone
-  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+  replace: dest={{ opentsdb_conf_file }}
            regexp='tsd.core.timezone = .*'
            replace="tsd.core.timezone = {{ tz.stdout_lines[0] }}"
   become_user: trafodion
@@ -123,11 +120,19 @@
     zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
 
 - name: Edit opentsdb.conf for zookeeper nodes
-  replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf
+  replace: dest={{ opentsdb_conf_file }}
            regexp='tsd.storage.hbase.zk_quorum = .*'
            replace="tsd.storage.hbase.zk_quorum = {{ ','.join(zkhosts.split()) }}"
   become_user: trafodion
   become: yes
+
+- name: Edit opentsdb.conf for hbase root
+  replace: dest={{ opentsdb_conf_file }}
+           regexp='tsd.storage.hbase.zk_basedir = /hbase'
+           replace='tsd.storage.hbase.zk_basedir = /hbase-unsecure'
+  become_user: trafodion
+  become: yes
+  when: "'HDP' in distro"
 
 - name: Registering Metrics
   shell: "source /home/trafodion/.bashrc; if [[ -f {{ mgblty_tools_dir }}/registerMetrics.py ]]; then python {{ mgblty_tools_dir }}/registerMetrics.py; else {{ mgblty_tools_dir }}/register_metrics.sh; fi"

@@ -50,16 +50,10 @@
   become: yes
 
 - name: Get RPM location
-  shell: "rpm -ql {{ rpm_basename }} |head -1"
+  shell: "rpm -ql {{ rpm_basename }}-{{ traf_version }} |head -1"
   register: traf_loc
     
-- name: Get RPM version
-  shell: "echo {{ traf_loc.stdout }} | sed -r 's/.*-(.*)/\\1/g'"
-  register: traf_version
-  when: traf_loc|success
-
-- name: Set sqroot and traf_ver variables
+- name: Set sqroot variables
   set_fact:
     sq_root: "{{ traf_loc.stdout }}"
-    traf_ver: "{{ traf_version.stdout }}"
-  when: traf_version|success
+  when: traf_loc|success

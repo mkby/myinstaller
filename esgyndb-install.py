@@ -27,6 +27,7 @@ cfgs = defaultdict(str)
 
 installer_loc = sys.path[0]
 tmp_file = installer_loc + '/.esgyndb_config_temp'
+def_cfgfile = installer_loc + '/esgyndb_config'
 
 class ParseJson:
     """ 
@@ -409,15 +410,16 @@ class UserInput:
         ''' show the final configs to user '''
         print '\n  **** Final Configs ****'
         pt = PrettyTable(['config type', 'value'])
-        pt.align['config type'] = 'l'
-        pt.align['value'] = 'l'
+        pt.align['config type'] = pt.align['value'] = 'l'
         for k,v in sorted(cfgs.items()):
             if self.in_data.has_key(k):
                 if self.in_data[k].has_key('ispasswd') or 'confirm' in k: continue
                 pt.add_row([k, v])
         print pt
         confirm = self.get_input('confirm_all')
-        if confirm == 'N': log_err('User quit')
+        if confirm == 'N': 
+            if os.path.exists(def_cfgfile): os.remove(def_cfgfile)
+            log_err('User quit')
 
 
 def expNumRe(text):
@@ -511,27 +513,32 @@ def user_input(no_dbmgr=False):
     g('java_home')
     # find trafodion rpm in installer folder, if more than one
     # rpm found, use the first one
-    def_rpm = glob('%s/trafodion*.rpm' % installer_loc)
-    if def_rpm:
-        u.get_input('traf_rpm', def_rpm[0])
+    traf_rpm = glob('%s/trafodion*.rpm' % installer_loc)
+    if traf_rpm:
+        u.get_input('traf_rpm', traf_rpm[0])
     else:
         g('traf_rpm')
 
     # get rpm basename from rpm filename
     try:
-        cfgs['rpm_basename'] = re.search(r'\/(\w+)-\d\.\d\.\d-.*', cfgs['traf_rpm']).group(1)
+        cfgs['rpm_basename'], cfgs['traf_version'] = re.search(r'(trafodion.*)-(\d\.\d\.\d)-.*', cfgs['traf_rpm']).groups()
     except:
-        log_err('Invalid RPM name, be careful don\'t rename RPM name')
+        log_err('Invalid trafodion RPM name, be careful don\'t rename original RPM name')
 
     if not no_dbmgr:
         # find esgyndb manager rpm in installer folder, if more than one
         # rpm found, use the first one
-        # we don't get dbmgr rpm name from filename because dbmgr has uniq rpm name
         dbmgr_rpm = glob('%s/esgynDB-manager*.rpm' % installer_loc)
         if dbmgr_rpm:
             u.get_input('dbmgr_rpm', dbmgr_rpm[0])
         else:
             g('dbmgr_rpm')
+
+        try:
+            cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = re.search(r'(esgynDB-manager.*)-(\d\.\d\.\d)-.*', cfgs['dbmgr_rpm']).groups()
+        except:
+            log_err('Invalid esgynDB manager RPM name, be careful don\'t rename original RPM name')
+
         g('db_admin_user')
         g('db_admin_pwd')
 
@@ -717,7 +724,6 @@ def main():
     #######################################
     format_output('EsgynDB Installation Start')
     global cfgs, installer_loc
-    def_cfgfile = installer_loc + '/esgyndb_config'
     if options.cfgfile:
         if not os.path.exists(options.cfgfile): 
             log_err('Cannot find config file \'%s\'' % options.cfgfile)
@@ -835,7 +841,7 @@ def main():
         # or specify the backup config file to install again
         try:
             # only rename default config file
-            if config_file == def_cfgfile:
+            if config_file == def_cfgfile and os.path.exists(config_file):
                 os.rename(config_file, config_file + '.bak' + ts)
         except OSError:
             log_err('Cannot rename config file')
