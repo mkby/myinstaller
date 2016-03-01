@@ -27,8 +27,10 @@
   shell: "curl -k -u {{ mgr_user }}:{{ mgrpwd }} -H 'X-Requested-By: Trafodion' -X PUT -d '{\"RequestInfo\": {\"context\" :\"Start all services\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}' {{ serv_url }}"
   register: start_result
 
+- debug: var=start_result
+
 - name: HDP - Parse url with command id
-  shell: "echo {{ start_result.stdout_lines }} |awk '{print $4}'|sed -r s'#\\\"(.*)\\\".*#\\1#g'"
+  shell: "echo {{ start_result.stdout_lines }} |awk -F'\"' '{print $4}'|sed -r s'#\\\"(.*)\\\".*#\\1#g'"
   register: cmd_url
 
 - name: "HDP - Check Hadoop services are started (timeout: 10mins)"

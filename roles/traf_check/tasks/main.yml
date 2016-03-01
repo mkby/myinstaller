@@ -30,21 +30,20 @@
   register: trafinstalled
   become: yes
 
-- name: Check if Trafodion bashrc is configured
+- name: Check if Trafodion bashrc exists
   stat: path=/home/trafodion/.bashrc
-  register: trafbashrc
+  register: bashrc
   become: yes
 
-#- name: Check if Trafodion is running
-#  shell: "source /home/trafodion/.bashrc; sqcheck|grep -c 'The SQ environment is up!'; echo -n"
-#  register: trafstat
-#  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and trafbashrc.stat.exists==True
-#  become_user: trafodion
-#  become: yes
+- name: Check if Trafodion bashrc is configured
+  shell: 'grep -c MY_NODES /home/trafodion/.bashrc; echo -n'
+  register: bashrc_conf
+  when: bashrc.stat.exists==True
+  become: yes
 
 - name: Stop Trafodion anyway
   shell: "source /home/trafodion/.bashrc; echo 'y'|ckillall"
-  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and trafbashrc.stat.exists==True
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and bashrc.stat.exists==True and bashrc_conf.stdout>='1'
   become_user: trafodion
   become: yes
 
@@ -53,5 +52,5 @@
 
 - set_fact:
     traf_init: "N"
-  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and trafbashrc.stat.exists==True
+  when: inventory_hostname in groups['firstnode'] and trafinstalled.stdout=='1' and bashrc.stat.exists==True
   

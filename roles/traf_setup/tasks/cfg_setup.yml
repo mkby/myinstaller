@@ -1,7 +1,7 @@
 ---
 - name: Disable iptables
   service: name=iptables state=stopped
-  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+  when: ansible_os_family == 'RedHat' and ansible_distribution_major_version != '7'
 
 - name: Set max Kernel pid
   shell: "sysctl -w kernel.pid_max=65535 2>&1 > /dev/null"
@@ -41,9 +41,15 @@
     hbase_lib_path: "/usr/hdp/current/hbase-regionserver/lib"
   when: "'HDP' in distro"
 
-- name: Copy HBase trx jar file to all nodes
+- name: Copy HBase trx jar file to all nodes - CDH
   shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_ver }}/export/lib/hbase-trx-cdh* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
+  when: "'CDH' in distro"
+
+- name: Copy HBase trx jar file to all nodes - HDP
+  shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_ver }}/export/lib/hbase-trx-hdp* {{ hbase_lib_path }} 2>/dev/null; echo -n"
+  become: yes
+  when: "'HDP' in distro"
 
 - name: Copy trafodion utility jar file to all nodes
   shell: "cp /home/trafodion/{{ rpm_basename }}-{{ traf_ver }}/export/lib/trafodion-utility* {{ hbase_lib_path }} 2>/dev/null; echo -n"
@@ -74,6 +80,7 @@
 
 - name: Modify dcs master file
   lineinfile: dest={{ dcs_master_file }} line={{ groups['firstnode'][0] }}
+  ignore_errors: true
   become: yes
 
 - name: Modify dcs-env.sh
