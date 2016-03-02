@@ -13,6 +13,7 @@
 
  - Support installing on multiple clusters managed by one cloudera manager
  - Support running installer from any node, as long as it can ssh to esgynDB nodes
+ - Support installing esgynDB on multiple regionserver groups in cloudera manager
  - Support installing esgynDB on non-passwordless ssh nodes
  - Auto discover for HBase regionserver nodes and hbase/hdfs system user
 
