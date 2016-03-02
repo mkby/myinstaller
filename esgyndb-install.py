@@ -543,7 +543,7 @@ def user_input(no_dbmgr=False):
 
     cluster_cfgs = check_mgr_url()
     c_index = 0
-    # support multiple clusters
+    # support multiple clusters, test on CDH only
     if len(cluster_cfgs) > 1:
         for index, config in enumerate(cluster_cfgs):
             print str(index + 1) + '. ' + config[1]
@@ -578,7 +578,10 @@ def user_input(no_dbmgr=False):
         while cnt <= 2:
             cnt += 1
             if cnt == 2: print ' === Please try to input node list again ==='
-            node_list = ' '.join(expNumRe(g('node_list')))
+            node_lists = expNumRe(g('node_list'))
+            if set(node_lists).difference(set(rsnodes)):
+                log_err('Incorrect node list, should be part of RegionServer nodes')
+            node_list = ' '.join(node_lists)
             print ' === NODE LIST ===\n' + node_list
             confirm = u.get_input('confirm_nodelist')
             if confirm == 'N': 
