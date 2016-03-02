@@ -19,13 +19,17 @@
 **Examples:**
 
 - Install esgynDB in guide mode without esgynDB manager:
+
 ``esgyndb-install.py --no-dbmgr``
 
 - Install esgynDB in config mode with 10 parallel processes (default is 5):
+
 ``esgyndb-install.py --config-file xxx_config --fork 10``
 
 - Run installer from local system with user a, install esgynDB on remote nodes with user b, and user b has configured passwordless ssh:
+
 `` esgyndb-install.py --remote-user b --disable-pass``
 
 - Generate the config file only but not doing the real install:
+
 `` esgyndb-install.py --dryrun``
