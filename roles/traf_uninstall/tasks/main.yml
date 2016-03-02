@@ -8,12 +8,12 @@
   become: yes
   become_user: trafodion
   ignore_errors: true
-  when: inventory_hostname in groups['firstnode'] and instance_exist.stdout!='0'
+  when: instance_exist.stdout!='0'
 
 - name: Uninstall trafodion RPM - RedHat/CentOS
   yum: name=trafodion state=absent
   become: yes
-  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+  when: ansible_os_family == 'RedHat'
 
 - name: Uninstall trafodion RPM - SuSE
   zypper: name=trafodion state=absent
@@ -23,7 +23,7 @@
 - name: Uninstall esgynDB-manager RPM - RedHat/CentOS
   yum: name=esgynDB-manager state=absent
   become: yes
-  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+  when: ansible_os_family == 'RedHat'
 
 - name: Uninstall esgynDB-manager RPM - SuSE
   zypper: name=esgynDB-manager state=absent
@@ -40,10 +40,11 @@
   ignore_errors: true
 
 - name: Remove unused files and settings
-  shell: "rm /etc/security/limits.d/trafodion.conf 2>/dev/null; rm /usr/lib/hbase/lib/hbase-trx-cdh* -rf; rm /opt/cloudera/parcels/CDH/lib/hbase/lib/hbase-trx-cdh* -rf;"
+  shell: "rm /etc/security/limits.d/trafodion.conf /usr/lib/hbase/lib/hbase-trx-* /opt/cloudera/parcels/CDH/lib/hbase/lib/hbase-trx-* /usr/hdp/current/hbase-regionserver/lib/hbase-trx-* -rf 2>/dev/null"
   become: yes
 
 - name: Delete trafodion user
   user: name=trafodion state=absent remove=yes
   become: yes
+  ignore_errors: true
 
