@@ -685,6 +685,8 @@ def main():
                 help="Verbose mode for ansible.")
     parser.add_option("--dryrun", action="store_true", dest="dryrun", default=False,
                 help="Dry run mode, it will only generate the config file.") 
+    parser.add_option("--no-mod", action="store_true", dest="nomod", default=False,
+                help="Do not modify hadoop configuration, it is really helpful when you reinstall esgynDB.")
     parser.add_option("--no-dbmgr", action="store_true", dest="nodbmgr", default=False,
                 help="Do not install esgynDB manager.")
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
@@ -812,7 +814,14 @@ def main():
             # force set to false
             no_dbmgr = False
 
-        if no_dbmgr: cmd += ' --skip-tags=dbmgr'
+        if no_dbmgr or options.nomod: 
+            cmd += ' --skip-tags='
+            skip_item = ''
+            if no_dbmgr: skip_item = 'dbmgr'
+            if options.nomod: skip_item = 'mod'
+            if no_dbmgr and options.nomod: skip_item = 'dbmgr,mod'
+            cmd += skip_item
+
         if not options.dispass: cmd += ' -k'
         if options.verbose: cmd += ' -v'
         if options.user: cmd += ' -u %s' % options.user
