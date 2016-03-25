@@ -21,6 +21,7 @@ from optparse import OptionParser
 from glob import glob
 from collections import defaultdict
 from prettytable import PrettyTable
+from subprocess import Popen, PIPE
 
 # init global cfgs for user input
 cfgs = defaultdict(str)
@@ -82,13 +83,13 @@ class HttpGet:
 class HadoopDiscover:
     ''' discover for hadoop related info '''
     def __init__(self, distro, cluster_name, index):
-        self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
+        self.rsnodes = []
+        self.users = {}
         self.distro = distro
+        self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.index = index
         self.cluster_name = cluster_name
         self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name.replace(' ', '%20'))
-        self.rsnodes = []
-        self.users = {}
 
     def get_hadoop_users(self):
         if 'CDH' in self.distro:
@@ -174,7 +175,7 @@ class UserInput:
             },
             'hdfs_user':
             {
-                'prompt':'Enter hdfs user name',
+                'prompt':'Enter hadoop user name',
                 'default':'hdfs',
                 'isuser': True
             },
@@ -260,6 +261,23 @@ class UserInput:
                 'prompt':'Enter number of DCS client connections per node',
                 'default':'8',
                 'isdigit':True
+            },
+            'first_rsnode':
+            {
+                'prompt':'Enter the hostname of first Apache HBase RegionServer node'
+            },
+            'hadoop_home':
+            {
+                'prompt':'Enter Apache Hadoop directory location'
+            },
+            'hbase_home':
+            {
+                'prompt':'Enter Apache HBase directory location'
+            },
+            'hive_home':
+            {
+                'prompt':'Enter Apache Hive directory location if exists',
+                'default':'NO_HIVE'
             },
             'mgr_url':
             {
@@ -470,6 +488,7 @@ def check_node_conn():
         if rc: log_err('Cannot ping %s, please check network connection or /etc/hosts configured correctly ' % node)
 
 def check_mgr_url():
+    if cfgs['distro'] == 'apache': return
     hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
     validate_url_v1 = '%s/api/v1/clusters' % cfgs['mgr_url']
     validate_url_v6 = '%s/api/v6/clusters' % cfgs['mgr_url']
@@ -499,7 +518,7 @@ def check_mgr_url():
     return cluster_cfgs
 
     
-def user_input(no_dbmgr=False):
+def user_input(no_dbmgr=False, vanilla_hadoop=False):
     """ get user's input and check input value """
     global cfgs, tmp_file, installer_loc
     # load from temp storaged config file
@@ -534,52 +553,68 @@ def user_input(no_dbmgr=False):
         g('db_admin_user')
         g('db_admin_pwd')
 
-    url = g('mgr_url')
-    if not ('http:' in url or 'https:' in url): 
-        cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
-
-    g('mgr_user')
-    g('mgr_pwd')
-
-    cluster_cfgs = check_mgr_url()
-    c_index = 0
-    # support multiple clusters, test on CDH only
-    if len(cluster_cfgs) > 1:
-        for index, config in enumerate(cluster_cfgs):
-            print str(index + 1) + '. ' + config[1]
-        c_index = int(g('cluster_no')) - 1
-        if c_index < 0 or c_index >= len(cluster_cfgs):
-            log_err('Incorrect number')
-
-    distro, cluster_name = cluster_cfgs[c_index]
-    discover = HadoopDiscover(distro, cluster_name, c_index+1)
-    rsnodes = discover.get_rsnodes()
-    hadoop_users = discover.get_hadoop_users()
-
-    # cdh uses different service names in multiple clusters
-    if c_index == 0:
-        cfgs['hbase_service_name'] = 'hbase'
-        cfgs['hdfs_service_name'] = 'hdfs'
-        cfgs['zookeeper_service_name'] = 'zookeeper'
+    if vanilla_hadoop:
+        cfgs['hadoop_home'] = g('hadoop_home')
+        cfgs['hbase_home'] = g('hbase_home')
+        cfgs['hive_home'] = g('hive_home')
+        cfgs['hdfs_user'] = g('hdfs_user')
+        cfgs['hbase_user'] = g('hbase_user')
+        cfgs['first_rsnode'] = g('first_rsnode')
+        cfgs['distro'] = 'apache'
     else:
-        cfgs['hbase_service_name'] = 'hbase' + str(c_index+1)
-        cfgs['hdfs_service_name'] = 'hdfs' + str(c_index+1)
-        cfgs['zookeeper_service_name'] = 'zookeeper' + str(c_index+1)
-    
-    cfgs['distro'] = distro
-    cfgs['cluster_name'] = cluster_name.replace(' ', '%20')
-    cfgs['hdfs_user'] = hadoop_users['hdfs_user']
-    cfgs['hbase_user'] = hadoop_users['hbase_user']
+        url = g('mgr_url')
+        if not ('http:' in url or 'https:' in url): 
+            cfgs['mgr_url'] = 'http://' + cfgs['mgr_url']
 
-    # manually set node list
-    if  g('use_hbase_node') == 'N':
+        g('mgr_user')
+        g('mgr_pwd')
+
+        cluster_cfgs = check_mgr_url()
+        c_index = 0
+        # support multiple clusters, test on CDH only
+        if len(cluster_cfgs) > 1:
+            for index, config in enumerate(cluster_cfgs):
+                print str(index + 1) + '. ' + config[1]
+            c_index = int(g('cluster_no')) - 1
+            if c_index < 0 or c_index >= len(cluster_cfgs):
+                log_err('Incorrect number')
+
+        # cdh uses different service names in multiple clusters
+        if c_index == 0:
+            cfgs['hbase_service_name'] = 'hbase'
+            cfgs['hdfs_service_name'] = 'hdfs'
+            cfgs['zookeeper_service_name'] = 'zookeeper'
+        else:
+            cfgs['hbase_service_name'] = 'hbase' + str(c_index+1)
+            cfgs['hdfs_service_name'] = 'hdfs' + str(c_index+1)
+            cfgs['zookeeper_service_name'] = 'zookeeper' + str(c_index+1)
+
+        distro, cluster_name = cluster_cfgs[c_index]
+        discover = HadoopDiscover(distro, cluster_name, c_index+1)
+        rsnodes = discover.get_rsnodes()
+        hadoop_users = discover.get_hadoop_users()
+        
+        cfgs['distro'] = distro
+        cfgs['cluster_name'] = cluster_name.replace(' ', '%20')
+        cfgs['hdfs_user'] = hadoop_users['hdfs_user']
+        cfgs['hbase_user'] = hadoop_users['hbase_user']
+        cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
+
+    # manually set node list in apache hadoop
+    if vanilla_hadoop:
+        use_hbase_node = 'N'
+    else:
+        use_hbase_node = g('use_hbase_node')
+
+    if use_hbase_node == 'N':
         cnt = 0
         # give user another try if input is wrong
         while cnt <= 2:
             cnt += 1
             if cnt == 2: print ' === Please try to input node list again ==='
             node_lists = expNumRe(g('node_list'))
-            if set(node_lists).difference(set(rsnodes)):
+            # don't check for apache hadoop
+            if not vanilla_hadoop and set(node_lists).difference(set(rsnodes)):
                 log_err('Incorrect node list, should be part of RegionServer nodes')
             node_list = ' '.join(node_lists)
             print ' === NODE LIST ===\n' + node_list
@@ -600,8 +635,11 @@ def user_input(no_dbmgr=False):
     # set other config to cfgs
     cfgs['my_nodes'] = cfgs['node_list'].replace(' ', ' -w ')
     cfgs['first_node'] = cfgs['node_list'].split()[0]
-    cfgs['first_rsnode'] = rsnodes[0] # first regionserver node
-    cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
+    if vanilla_hadoop:
+        cfgs['hbase_xml_file'] = cfgs['hbase_home'] + '/conf/hbase-site.xml'
+        cfgs['hdfs_xml_file'] = cfgs['hadoop_home'] + '/etc/hadoop/hdfs-site.xml'
+    else:
+        cfgs['hbase_xml_file'] = '/etc/hbase/conf/hbase-site.xml'
     cfgs['config_created_date'] = time.strftime('%Y/%m/%d %H:%M %Z')
     
     g('traf_pwd')
@@ -687,6 +725,8 @@ def main():
                 help="Dry run mode, it will only generate the config file.") 
     parser.add_option("--no-mod", action="store_true", dest="nomod", default=False,
                 help="Do not modify hadoop configuration, it is really helpful when you reinstall esgynDB.")
+    parser.add_option("--vanilla-hadoop", action="store_true", dest="vanilla", default=False,
+                help="Install esgynDB on top of Vanilla Hadoop.")
     parser.add_option("--no-dbmgr", action="store_true", dest="nodbmgr", default=False,
                 help="Do not install esgynDB manager.")
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
@@ -710,11 +750,8 @@ def main():
         if options.method not in ['sudo','su','pbrun','pfexec','runas','doas']:
             log_err('Wrong method, valid methods: [ sudo | su | pbrun | pfexec | runas | doas ].')
         
-    # set no_dbmgr flag
-    if options.nodbmgr:
-        no_dbmgr = True
-    else:
-        no_dbmgr = False
+    no_dbmgr = True if options.nodbmgr else False
+    vanilla_hadoop = True if options.vanilla else False
 
     #######################################
     # get user input and gen variable file
@@ -737,7 +774,7 @@ def main():
     # not specified config file and default config file doesn't exist either
     if options.dryrun or (not os.path.exists(config_file)): 
         if options.dryrun: format_output('DryRun Start')
-        user_input(no_dbmgr)
+        user_input(no_dbmgr, vanilla_hadoop)
 
         # save config file as json format
         print '\n** Generating json file to save configs ... \n'
@@ -814,13 +851,19 @@ def main():
             # force set to false
             no_dbmgr = False
 
-        if no_dbmgr or options.nomod: 
-            cmd += ' --skip-tags='
-            skip_item = ''
-            if no_dbmgr: skip_item = 'dbmgr'
-            if options.nomod: skip_item = 'mod'
-            if no_dbmgr and options.nomod: skip_item = 'dbmgr,mod'
-            cmd += skip_item
+        # handle skip option
+        skip_item = ''
+        if options.nomod:
+            skip_item = 'apache_mod,mod'
+        elif vanilla_hadoop:
+            skip_item = 'mod'
+        else:
+            skip_item = 'apache_mod'
+            
+        if no_dbmgr:
+            skip_item += ',dbmgr'
+
+        cmd += ' --skip-tags=' + skip_item
 
         if not options.dispass: cmd += ' -k'
         if options.verbose: cmd += ' -v'
@@ -858,7 +901,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt,EOFError):
         tp = ParseJson(tmp_file)
         tp.jsave(cfgs)
         print '\nAborted...'

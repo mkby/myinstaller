@@ -1,0 +1,37 @@
+- name: Add Apache Hadoop ENV to .bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              insertafter="^export JAVA_HOME"
+              line="export HADOOP_PREFIX={{ hadoop_home }}"
+  become: yes
+  become_user: trafodion
+
+- name: Add Apache HBase ENV to .bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              insertafter="^export JAVA_HOME"
+              line="export HBASE_HOME={{ hbase_home }}"
+  become: yes
+  become_user: trafodion
+
+- name: Add Apache Hive ENV to .bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              insertafter="^export JAVA_HOME"
+              line="export HIVE_HOME={{ hive_home }}"
+  when: hive_home!='NO_HIVE'
+  become: yes
+  become_user: trafodion
+
+- name: Add Hbase Distro ENV to .bashrc
+  lineinfile: dest=/home/trafodion/.bashrc
+              insertafter="^export JAVA_HOME"
+              line="export HBASE_DISTRO=APACHE"
+  become: yes
+  become_user: trafodion
+
+
+- name: Modify Hadoop/HBase configs
+  script: modify_apache.py "{{ hbase_xml_file }}" "{{ hdfs_xml_file }}"
+  become: yes
+  become_user: "{{ hbase_user }}"
+
+
+#- name: Modify ZooKeeper configs

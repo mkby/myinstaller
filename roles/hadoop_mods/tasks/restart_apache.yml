@@ -1,0 +1,24 @@
+# assume esgynDB nodes are the same as hadoop nodes
+- name: Stop Apache HBase
+  shell: "{{ hbase_home }}/bin/stop-hbase.sh"
+  become: yes
+  become_user: "{{ hbase_user }}"
+  when: inventory_hostname in groups['firstrsnode']
+
+- name: Stop Apache Hadoop
+  shell: "{{ hadoop_home }}/sbin/stop-dfs.sh"
+  become: yes
+  become_user: "{{ hdfs_user }}"
+  when: inventory_hostname in groups['firstrsnode']
+
+- name: Start Apache Hadoop
+  shell: "{{ hadoop_home }}/sbin/start-dfs.sh"
+  become: yes
+  become_user: "{{ hdfs_user }}"
+  when: inventory_hostname in groups['firstrsnode']
+
+- name: Start Apache HBase
+  shell: "{{ hbase_home }}/bin/start-hbase.sh"
+  become: yes
+  become_user: "{{ hbase_user }}"
+  when: inventory_hostname in groups['firstrsnode']

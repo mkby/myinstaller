@@ -2,11 +2,13 @@
 - name: parse manager url password
   shell: "echo {{ mgr_pwd }} | base64 -d"
   register: pwd
+  when: mgr_pwd is defined
 
 # use a different var name since config var mgr_pwd 
 # will overwrite the value set here
 - set_fact:
     mgrpwd: "{{ pwd.stdout }}"
+  when: mgr_pwd is defined
 
 - include: modify_cdh.yml
   when: "'CDH' in distro"
@@ -17,3 +19,8 @@
   when: "'HDP' in distro"
 - include: restart_hdp.yml
   when: "'HDP' in distro"
+
+- include: modify_apache.yml
+  when: "'apache' in distro"
+- include: restart_apache.yml
+  when: "'apache' in distro"

@@ -19,6 +19,8 @@
   register: javac_ver
   failed_when: java_status.stat.exists==False or javac_ver.stdout!='1.7'
 
+#- name: Check Hbase status
+
 - name: Check Hardware Platform should be x86_64
   command: "uname -i"
   register: hw
