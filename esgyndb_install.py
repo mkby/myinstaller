@@ -21,7 +21,6 @@ from optparse import OptionParser
 from glob import glob
 from collections import defaultdict
 from prettytable import PrettyTable
-from subprocess import Popen, PIPE
 
 # init global cfgs for user input
 cfgs = defaultdict(str)
