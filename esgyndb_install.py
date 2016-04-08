@@ -20,7 +20,11 @@ import time
 from optparse import OptionParser
 from glob import glob
 from collections import defaultdict
-from prettytable import PrettyTable
+try:
+    from prettytable import PrettyTable
+except ImportError:
+    print 'Python module prettytable is not found. Install python-prettytable first.'
+    sys.exit(1)
 
 # init global cfgs for user input
 cfgs = defaultdict(str)
