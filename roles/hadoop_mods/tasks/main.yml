@@ -16,9 +16,9 @@
   when: "'CDH' in distro"
 
 - include: modify_hdp.yml
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsights' in distro"
 - include: restart_hdp.yml
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsights' in distro"
 
 - include: modify_apache.yml
   when: "'apache' in distro"

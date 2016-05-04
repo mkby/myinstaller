@@ -132,7 +132,7 @@
            replace='tsd.storage.hbase.zk_basedir = /hbase-unsecure'
   become_user: trafodion
   become: yes
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsights' in distro"
 
 - name: Registering Metrics
   shell: "source /home/trafodion/.bashrc; if [[ -f {{ mgblty_tools_dir }}/registerMetrics.py ]]; then python {{ mgblty_tools_dir }}/registerMetrics.py; else {{ mgblty_tools_dir }}/register_metrics.sh; fi"
@@ -158,14 +158,14 @@
            regexp='60010' replace='16010'
   become_user: trafodion
   become: yes
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsights' in distro"
 
 - name: Edit tcollector hbase_regionserver
   replace: dest={{ mgblty_install_dir }}/tcollector/collectors/0/hbase_regionserver.py
            regexp='60030' replace='16030'
   become_user: trafodion
   become: yes
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsights' in distro"
 
 - name: Get zookeeper quorum
   shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"

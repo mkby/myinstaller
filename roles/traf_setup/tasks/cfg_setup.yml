@@ -41,6 +41,11 @@
     hbase_lib_path: "/usr/hdp/current/hbase-regionserver/lib"
   when: "'HDP' in distro"
 
+- name: Set HDP Hbase lib path if exists
+  set_fact:
+    hbase_lib_path: "/usr/iop/current/hbase-regionserver/lib"
+  when: "'BigInsight' in distro"
+
 - name: Set Apache Hbase lib path if exists
   set_fact:
     hbase_lib_path: "{{ hbase_home }}/lib"
@@ -55,11 +60,10 @@
 - name: Copy HBase trx jar file to all nodes - HDP
   shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-hdp* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
-  when: "'HDP' in distro"
+  when: "'HDP' in distro or 'BigInsight' in distro"
 
-- name: Copy HBase trx jar file to all nodes - HDP
-  #shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-apache* {{ hbase_lib_path }} 2>/dev/null; echo -n"
-  shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-hdp* {{ hbase_lib_path }} 2>/dev/null; echo -n"
+- name: Copy HBase trx jar file to all nodes - Apache
+  shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/hbase-trx-apache* {{ hbase_lib_path }} 2>/dev/null; echo -n"
   become: yes
   when: "'apache' in distro"
 
