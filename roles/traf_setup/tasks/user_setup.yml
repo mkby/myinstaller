@@ -21,8 +21,23 @@
     enable_ha: "true"
   when: dcs_ha=='Y'
 
+- name: Set distro env
+  set_fact: 
+    hbase_distro: "CDH"
+  when: "'CDH' in distro"
+
+- name: Set distro env
+  set_fact: 
+    hbase_distro: "HDP"
+  when: "'HDP' in distro or 'BigInsights' in distro"
+
+- name: Set distro env
+  set_fact: 
+    hbase_distro: "APACHE"
+  when: "'apache' in distro"
+
 - name: modify bashrc file for trafodion user
-  template: src=bashrc_default.j2 dest=/home/trafodion/.bashrc
+  template: src=bashrc_default.j2 dest=/home/trafodion/.bashrc backup=yes
   become: yes
 
 - name: modify limits config on all nodes

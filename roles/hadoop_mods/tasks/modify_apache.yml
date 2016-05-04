@@ -20,13 +20,6 @@
   become: yes
   become_user: trafodion
 
-- name: Add Hbase Distro ENV to .bashrc
-  lineinfile: dest=/home/trafodion/.bashrc
-              insertafter="^export JAVA_HOME"
-              line="export HBASE_DISTRO=APACHE"
-  become: yes
-  become_user: trafodion
-
 
 - name: Modify Hadoop/HBase configs
   script: modify_apache.py "{{ hbase_xml_file }}" "{{ hdfs_xml_file }}"
