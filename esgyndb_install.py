@@ -97,7 +97,7 @@ class HadoopDiscover:
     def get_hadoop_users(self):
         if 'CDH' in self.distro:
             self._get_cdh_users()
-        elif 'HDP' in self.distro:
+        elif 'HDP' in self.distro or 'BigInsights' in self.distro:
             self._get_hdp_users()
         return self.users
 
@@ -136,6 +136,8 @@ class HadoopDiscover:
         elif 'HDP' in self.distro:
             if not '2.3' in self.distro:
                 log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+            self._get_rsnodes_hdp()
+        elif 'BigInsights' in self.distro:
             self._get_rsnodes_hdp()
 
         self.rsnodes.sort()
