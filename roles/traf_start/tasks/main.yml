@@ -1,8 +1,15 @@
 
 - name: Create sqconfig for trafodion instance
+  script:  traf_sqconfig 15 1 {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
+  become: yes
+  become_user: trafodion
+  when: "'BigInsights' in distro"
+
+- name: Create sqconfig for trafodion instance
   script:  traf_sqconfig {{ ansible_processor_vcpus - 1 }} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
   become: yes
   become_user: trafodion
+  when: "'BigInsights' not in distro"
 
 - name: Run sqgen for trafodion instance
   shell: 'source /home/trafodion/.bashrc; sqgen'
