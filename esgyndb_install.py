@@ -134,8 +134,8 @@ class HadoopDiscover:
                 log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4')
             self._get_rsnodes_cdh()
         elif 'HDP' in self.distro:
-            if not '2.3' in self.distro:
-                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3')
+            if not '2.3' in self.distro and not '2.4' in self.distro:
+                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3/2.4')
             self._get_rsnodes_hdp()
         elif 'BigInsights' in self.distro:
             self._get_rsnodes_hdp()
@@ -536,9 +536,12 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
 
     g('java_home')
 
-    def _check_rpm(input_name, rpm_name):
+    def _check_rpm(input_name, rpm_namelist):
         # find rpm in installer folder, if more than one rpm found, use the first one
-        rpm_loc = glob('%s/%s*.rpm' % (installer_loc, rpm_name))
+        for rpm_name in rpm_namelist:
+            rpm_loc = glob('%s/%s*.rpm' % (installer_loc, rpm_name))
+            if rpm_loc: break
+
         if rpm_loc:
             u.get_input(input_name, rpm_loc[0])
         else:
@@ -546,15 +549,16 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
 
         # get rpm basename from rpm filename
         try:
-            rpm_basename, rpm_version = re.search(r'(%s.*)-(\d\.\d\.\d)-.*' % rpm_name, cfgs[input_name]).groups()
+            pattern = '|'.join(rpm_namelist)
+            rpm_basename, rpm_version = re.search(r'(%s.*)-(\d\.\d\.\d)-.*' % pattern, cfgs[input_name]).groups()
             return rpm_basename, rpm_version
         except:
             log_err('Invalid %s RPM name, be careful don\'t rename original RPM name' % rpm_name)
 
-    cfgs['traf_basename'], cfgs['traf_version'] = _check_rpm('traf_rpm', 'trafodion')
+    cfgs['traf_basename'], cfgs['traf_version'] = _check_rpm('traf_rpm', ['trafodion', 'esgynDB'])
 
     if not no_dbmgr:
-        cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', 'esgynDB-manager')
+        cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', ['esgynDB-manager'])
         g('db_admin_user')
         g('db_admin_pwd')
 
