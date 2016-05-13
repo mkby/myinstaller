@@ -15,35 +15,35 @@ class Deploy:
         self.cdh_version = "CDH5"
 
         self._get_host_allocate()
-
         self.cm_host = cm_host
-        try:
-            self.api = ApiResource(cm_host, cm_port, cm_user, cm_passwd, version=7)
-            self.cm = self.api.get_cloudera_manager()
-        except ApiException:
-            self._err('Cannot connect to cloudera manager on %s' % cm_host)
+
+        self.api = ApiResource(cm_host, cm_port, cm_user, cm_passwd, version=7)
+        self.cm = self.api.get_cloudera_manager()
 
         try:
             self.cluster = self.api.get_cluster(self.cluster_name)
-        except ApiException:
-            self.cluster = self.api.create_cluster(self.cluster_name, self.cdh_version)
-#        else:
-#            self._err('Failed to obtain cluster object')
+        except:
+            try:
+                self.cluster = self.api.create_cluster(self.cluster_name, self.cdh_version)
+            except:
+                self._err('Cannot connect to cloudera manager on %s' % cm_host)
 
         # add all our hosts to the cluster
         try:
             self.cluster.add_hosts(self.host_list)
             self._info('Add hosts successfully')
         except Exception as e:
-            print e
-            self._info('Already Added hosts')
+            if e.code == 400:
+                self._info('Already Added hosts')
+            elif e.code == 404:
+                self._err(e.message)
 
     def _err(self, msg):
-        print '\n***ERROR: ' + msg
+        print '\n\33[31m***ERROR: %s \33[0m' % msg
         exit(0)
 
     def _info(self, msg):
-        print '\n***INFO: ' + msg
+        print '\n\33[33m***INFO: %s \33[0m' % msg
 
     def _auto_allocate(self, hosts):
         # enable mgmt node if node count is larger than mgmt_th
@@ -64,7 +64,7 @@ class Deploy:
         # without mgmt node
         else:
             if host_num == 1:
-                self.ap_host = self.es_host = self.ho_host = self.sm_host = \
+                self.ap_host = self.es_host = self.ho_host = self.sm_host = self.jt_host = \
                 self.nn_host = self.hm_host = self.snn_host = self.hms_host = self.hs2_host = hosts[0]
             elif host_num > 1:
                 # nn, snn not on same node
@@ -92,15 +92,18 @@ class Deploy:
         conf.read("config.ini")
         try:
             hosts_data = conf.items('hosts')
-            roles_data = conf.items('roles')
-        except NoSectionError:
+        except:
             self._err('Incorrect config format')
 
-        self.host_list = [ i.strip() for i in hosts_data[0][1].split(',') ]
-        print self.host_list
+        try:
+            roles_data = conf.items('roles')
+        except:
+            roles_data = []
 
-        # parse role from config.ini
+        self.host_list = [ i.strip() for i in hosts_data[0][1].split(',') ]
+
         cfg_data = [ [i[0],i[1].split(',')] for i in roles_data ]
+        # auto set if no role config found
         if not cfg_data:
             self._auto_allocate(self.host_list)
             return
@@ -133,9 +136,13 @@ class Deploy:
         self.sm_host = role_host['SM'][0]
 
     def setup_cms(self):
-        # create the management service
         try:
             self.cm.delete_mgmt_service()
+        except:
+            pass
+
+        # create the management service
+        try:
             mgmt = self.cm.create_mgmt_service(ApiServiceSetupInfo())
             mgmt.create_role('AlertPublisher', "ALERTPUBLISHER", self.ap_host)
             mgmt.create_role('EventServer', "EVENTSERVER", self.es_host)
@@ -158,7 +165,7 @@ class Deploy:
                 parcels_list.append(p)
 
         if len(parcels_list) == 0:
-            self._err('No downloaded' + self.cdh_version + ' parcel found!')
+            self._err('No downloaded ' + self.cdh_version + ' parcel found!')
         elif len(parcels_list) > 1:
             index = raw_input('input parcel number:')
             if not index.isdigit:
@@ -250,7 +257,7 @@ class Deploy:
             hive_service = self.cluster.create_service('hive', 'HIVE')
             hive_service.create_role('hive-metastore', 'HIVEMETASTORE', self.hms_host)
             hive_service.create_role('hive-server2', 'HIVESERVER2', self.hs2_host)
-            hive_metastore_host = self.cm_host
+            hive_metastore_host = self.cm_host # should be same as cm's host, FQDN
             hive_metastore_name = 'hive'
             hive_metastore_password = 'hive'
             hive_metastore_database_port = '7432'
@@ -288,7 +295,10 @@ class Deploy:
                role = zk_service.create_role('zookeeper-' + str(zk_id), 'SERVER', zk_host)
      
         # use auto configure for *-site.xml configs
-        self.cluster.auto_configure()
+        try:
+            self.cluster.auto_configure()
+        except ApiException as e:
+            self._err(e.message)
 
 
     def start_cms(self):
@@ -312,9 +322,9 @@ class Deploy:
 
 
 if __name__ == "__main__":
-    deploy = Deploy(cm_host='eason-1.novalocal')
+    deploy = Deploy(cm_host=sys.argv[1])
     deploy.setup_cms()
-    #deploy.setup_parcel()
-    #deploy.setup_cdh()
+    deploy.setup_parcel()
+    deploy.setup_cdh()
     deploy.start_cms()
-    #deploy.start_cdh()
+    deploy.start_cdh()
