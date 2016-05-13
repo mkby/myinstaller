@@ -85,12 +85,11 @@ class HttpGet:
 
 class HadoopDiscover:
     ''' discover for hadoop related info '''
-    def __init__(self, distro, cluster_name, index):
+    def __init__(self, distro, cluster_name, hdfs_srv_name, hbase_srv_name):
         self.rsnodes = []
         self.users = {}
         self.distro = distro
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
-        self.index = index
         self.cluster_name = cluster_name
         self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name.replace(' ', '%20'))
 
@@ -110,12 +109,7 @@ class HadoopDiscover:
             self.users[v] = current_cfg['items'][0]['properties'][v]
 
     def _get_cdh_users(self):
-        def _get_username(hadoop_type, index):
-            if index == 1:
-                service_name = hadoop_type
-            else:
-                service_name = hadoop_type + str(index)
-
+        def _get_username(service_name, hadoop_type):
             cfg = self.hg.get_content('%s/services/%s/config' % (self.cluster_url, service_name))
             if cfg.has_key('items'):
                 for item in cfg['items']:
@@ -123,8 +117,8 @@ class HadoopDiscover:
                         return item['value']
             return hadoop_type
 
-        hdfs_user = _get_username('hdfs', self.index)
-        hbase_user = _get_username('hbase', self.index)
+        hdfs_user = _get_username(hdfs_srv_name, 'hdfs')
+        hbase_user = _get_username(hbase_srv_name, 'hbase')
 
         self.users = {'hbase_user':hbase_user, 'hdfs_user':hdfs_user}
 
@@ -599,7 +593,7 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
             cfgs['zookeeper_service_name'] = 'zookeeper' + str(c_index+1)
 
         distro, cluster_name = cluster_cfgs[c_index]
-        discover = HadoopDiscover(distro, cluster_name, c_index+1)
+        discover = HadoopDiscover(distro, cluster_name, cfgs['hdfs_service_name'], cfgs['hbase_service_name'])
         rsnodes = discover.get_rsnodes()
         hadoop_users = discover.get_hadoop_users()
         
