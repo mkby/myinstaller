@@ -89,6 +89,8 @@ class HadoopDiscover:
         self.rsnodes = []
         self.users = {}
         self.distro = distro
+        self.hdfs_srv_name = hdfs_srv_name
+        self.hbase_srv_name = hbase_srv_name
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.cluster_name = cluster_name
         self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name.replace(' ', '%20'))
@@ -117,8 +119,8 @@ class HadoopDiscover:
                         return item['value']
             return hadoop_type
 
-        hdfs_user = _get_username(hdfs_srv_name, 'hdfs')
-        hbase_user = _get_username(hbase_srv_name, 'hbase')
+        hdfs_user = _get_username(self.hdfs_srv_name, 'hdfs')
+        hbase_user = _get_username(self.hbase_srv_name, 'hbase')
 
         self.users = {'hbase_user':hbase_user, 'hdfs_user':hdfs_user}
 
