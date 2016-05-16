@@ -20,6 +20,16 @@
   become: yes
   when: inventory_hostname in groups['cdhmaster']
 
+- name: Stop Cloudera server
+  service: name=cloudera-scm-server state=stopped
+  become: yes
+  when: inventory_hostname in groups['cdhmaster']
+
+- name: Stop Cloudera server DB
+  service: name=cloudera-scm-server-db state=stopped
+  become: yes
+  when: inventory_hostname in groups['cdhmaster']
+
 - name: Start Cloudera server DB
   service: name=cloudera-scm-server-db state=restarted
   become: yes
@@ -34,6 +44,7 @@
   replace: dest=/etc/cloudera-scm-agent/config.ini
            regexp='server_host=.*'
            replace="server_host={{ groups['cdhmaster'][0] }}"
+  become: yes
 
 - name: Start Cloudera agent
   service: name=cloudera-scm-agent state=restarted

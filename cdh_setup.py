@@ -45,6 +45,9 @@ class Deploy:
     def _info(self, msg):
         print '\n\33[33m***INFO: %s \33[0m' % msg
 
+    def _ok(self, msg):
+        print '\n\33[32m***OK: %s \33[0m' % msg
+
     def _auto_allocate(self, hosts):
         # enable mgmt node if node count is larger than mgmt_th
         mgmt_th = 6
@@ -86,7 +89,6 @@ class Deploy:
 
         self.zk_hosts = hosts[-zk_num:]
 
-
     def _get_host_allocate(self):
         conf = ConfigParser()
         conf.read("config.ini")
@@ -117,7 +119,6 @@ class Deploy:
                 if role not in valid_roles: self._err('Incorrect role config')
                 role_host[role].append(item[0])
 
-        print role_host
         # cdh
         self.nn_host = role_host['NN'][0]
         self.snn_host = role_host['SNN'][0]
@@ -148,7 +149,7 @@ class Deploy:
             mgmt.create_role('EventServer', "EVENTSERVER", self.es_host)
             mgmt.create_role('HostMonitor', "HOSTMONITOR", self.hm_host)
             mgmt.create_role('ServiceMonitor', "SERVICEMONITOR", self.sm_host)
-            self._info('Cloudera management service created successfully.')
+            self._ok('Cloudera management service created successfully.')
         except ApiException:
             self._info('Cloudera management service had already been created.')
 
@@ -157,7 +158,7 @@ class Deploy:
         for i,p in enumerate(self.cluster.get_all_parcels()):
             if p.stage == 'AVAILABLE_REMOTELY': continue
             elif p.stage == 'ACTIVATED':
-                self._info('Parcel [%s] has already been activated, skipping parcel setting...' % p.version)
+                self._info('Parcel [%s] has already been activated' % p.version)
                 return
             else:
                 print "Available parcels:"
@@ -207,7 +208,7 @@ class Deploy:
             sleep(5)
             cdh_parcel = self.cluster.get_parcel(cdh_parcel.product, cdh_parcel.version)
 
-        self._info(cdh_parcel.product + ' ' + cdh_parcel.version + ' distributed')
+        self._ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' distributed')
 
         # activate the parcel
         cmd = cdh_parcel.activate()
@@ -219,93 +220,80 @@ class Deploy:
             sleep(5)
             cdh_parcel = self.cluster.get_parcel(cdh_parcel.product, cdh_parcel.version)
 
-        self._info(cdh_parcel.product + ' ' + cdh_parcel.version + ' activated')
+        self._ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' activated')
 
+    def _create_service(self, sdata):
+        try:
+            self.cluster.get_service(sdata['sname'])
+            self._info('Service %s had already been configured' % sdata['sname'])
+        except ApiException:
+            service = self.cluster.create_service(sdata['sname'], sdata['stype'])
+            self._ok('Service %s had been created successfully' % sdata['sname'])
+            for role in sdata['roles']:
+                if role.has_key('rhost'):
+                    service.create_role(role['rname'], role['rtype'], role['rhost'])
+                elif role.has_key('rhosts'):
+                    rid = 0
+                    for host in role['rhosts']:
+                        rid += 1
+                        service.create_role(role['rname'] + '-' + str(rid), role['rtype'], host)
 
     def setup_cdh(self):
-        # HDFS
-        try:
-            self.cluster.get_service('hdfs')
-            self._info('Service hdfs had already been configured')
-        except ApiException:
-            hdfs_service = self.cluster.create_service('hdfs', 'HDFS')
-            hdfs_service.create_role('hdfs-namenode', 'NAMENODE', self.nn_host)
-            hdfs_service.create_role('hdfs-secondarynamenode', 'SECONDARYNAMENODE', self.snn_host)
-            dn_id = 0
-            for dn_host in self.dn_hosts:
-                dn_id += 1
-                hdfs_service.create_role('hdfs-datanode-' + str(dn_id), 'DATANODE', dn_host)
+        service_data = [ { 'sname': 'hdfs', 'stype': 'HDFS',
+                           'roles': [ {'rname': 'hdfs-namenode', 'rtype': 'NAMENODE', 'rhost': self.nn_host},
+                                      {'rname': 'hdfs-secondarynamenode', 'rtype': 'SECONDARYNAMENODE', 'rhost': self.snn_host},
+                                      {'rname': 'hdfs-datanode', 'rtype': 'DATANODE', 'rhosts': self.dn_hosts} ]
+                         },
+                         { 'sname': 'zookeeper', 'stype': 'ZOOKEEPER',
+                           'roles': [ {'rname': 'zookeeper', 'rtype': 'SERVER', 'rhosts': self.zk_hosts} ]
+                         },
+                         { 'sname': 'hbase', 'stype': 'HBASE', 
+                           'roles': [ {'rname': 'hbase-master', 'rtype': 'MASTER', 'rhost': self.hm_host},
+                                      {'rname': 'hdfs-regionserver', 'rtype': 'REGIONSERVER', 'rhosts': self.rs_hosts} ]
+                         },
+                         { 'sname': 'hive', 'stype': 'HIVE', 
+                           'roles': [ {'rname': 'hive-metastore', 'rtype': 'HIVEMETASTORE', 'rhost': self.hms_host}, 
+                                      {'rname': 'hive-server2', 'rtype': 'HIVESERVER2', 'rhost': self.hs2_host}]
+                         },
+                         { 'sname': 'mapreduce', 'stype': 'MAPREDUCE', 
+                           'roles': [ {'rname': 'mapreduce-jobtracker', 'rtype': 'JOBTRACKER', 'rhost': self.jt_host},
+                                      {'rname': 'mapreduce-tasktracker', 'rtype': 'TASKTRACKER', 'rhosts': self.tt_hosts} ]
+                         }
+                      ]
 
+        for sdata in service_data:
+            self._create_service(sdata)
 
-        # MAPREDUCE (needed by hive)
+        # additional config for hive
         try:
-            self.cluster.get_service('mapreduce')
-            self._info('Service mapreduce had already been configured')
-        except ApiException:
-            mapreduce_service = self.cluster.create_service('mapreduce', 'MAPREDUCE')
-            mapreduce_service.create_role('mapreduce-jobtracker', 'JOBTRACKER', self.jt_host)
-            mr_id = 0
-            for tt_host in self.tt_hosts:
-                mr_id += 1
-                mapreduce_service.create_role('mapreduce-tasktracker-' + str(mr_id), 'TASKTRACKER', tt_host)
-
-        # HIVE
-        try:
-            self.cluster.get_service('hive')
-            self._info('Service hive had already been configured')
-        except ApiException:
-            hive_service = self.cluster.create_service('hive', 'HIVE')
-            hive_service.create_role('hive-metastore', 'HIVEMETASTORE', self.hms_host)
-            hive_service.create_role('hive-server2', 'HIVESERVER2', self.hs2_host)
+            hive_service = self.cluster.get_service('hive')
             hive_metastore_host = self.cm_host # should be same as cm's host, FQDN
             hive_metastore_name = 'hive'
             hive_metastore_password = 'hive'
             hive_metastore_database_port = '7432'
             hive_metastore_database_type = 'postgresql'
-            mapreduce_yarn_service = 'mapreduce'
-            zookeeper_service = 'zookeeper'
             hive_config = { 'hive_metastore_database_host' : hive_metastore_host, \
                             'hive_metastore_database_name' : hive_metastore_name, \
                             'hive_metastore_database_password' : hive_metastore_password, \
                             'hive_metastore_database_port' : hive_metastore_database_port, \
                             'hive_metastore_database_type' : hive_metastore_database_type }
             hive_service.update_config(hive_config)
+            self._ok('Additional hive configs had been updated')
+        except ApiException as e:
+            self._err(e.message)
 
-        # HBASE
-        try:
-            self.cluster.get_service('hbase')
-            self._info('Service hbase had already been configured')
-        except ApiException:
-            hbase_service = self.cluster.create_service('hbase', 'HBASE')
-            hbase_service.create_role('hbase-master', 'MASTER', self.hm_host)
-            rs_id = 0
-            for rs_host in self.rs_hosts:
-                rs_id += 1
-                hbase_service.create_role('hbase-regionserver-' + str(rs_id), 'REGIONSERVER', rs_host)
-
-        # ZOOKEEPER
-        try:
-            self.cluster.get_service('zookeeper')
-            self._info('Service ZooKeeper had already been configured')
-        except ApiException:
-            zk_service = self.cluster.create_service('zookeeper', 'ZOOKEEPER')
-            zk_id = 0
-            for zk_host in self.zk_hosts:
-               zk_id += 1
-               role = zk_service.create_role('zookeeper-' + str(zk_id), 'SERVER', zk_host)
-     
         # use auto configure for *-site.xml configs
         try:
             self.cluster.auto_configure()
         except ApiException as e:
             self._err(e.message)
 
-
     def start_cms(self):
         # start the management service
         self._info('Starting cloudera management service...')
         cms = self.cm.get_service()
         cms.start().wait()
+        self._ok('Cloudera management service started successfully')
 
     def start_cdh(self):
         self._info('Excuting first run command. This might take a while.')
@@ -318,13 +306,12 @@ class Deploy:
         if cmd.success != True:
             self._err('The first run command failed: ' + cmd.resultMessage)
 
-        self._info('First run successfully executed. Your cluster has been set up!')
-
+        self._ok('First run successfully executed. Your cluster has been set up!')
 
 if __name__ == "__main__":
     deploy = Deploy(cm_host=sys.argv[1])
     deploy.setup_cms()
     deploy.setup_parcel()
-    deploy.setup_cdh()
     deploy.start_cms()
+    deploy.setup_cdh()
     deploy.start_cdh()
