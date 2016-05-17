@@ -120,9 +120,8 @@
   when: dcs_ha=='Y'
 
 - name: Mod trafci for DCS HA
-  replace: dest={{ sq_root }}/trafci/bin/trafci regexp='localhost' replace={{ dcs_ip }}
+  replace: dest={{ sq_root }}/trafci/bin/trafci regexp='HNAME=.*' replace="HNAME={{ groups['firstnode'][0] }}:23400"
   become: yes
-  when: dcs_ha=='Y'
 
 - name: Mod backup-master file
   lineinfile: dest={{ dcs_bkmaster_file }} line={{ item }}
