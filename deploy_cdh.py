@@ -39,14 +39,14 @@ class Deploy:
                 self._err(e.message)
 
     def _err(self, msg):
-        print '\n\33[31m***ERROR: %s \33[0m' % msg
+        print '\n\33[31m***[ERROR]: %s \33[0m' % msg
         exit(0)
 
     def _info(self, msg):
-        print '\n\33[33m***INFO: %s \33[0m' % msg
+        print '\n\33[33m***[INFO]: %s \33[0m' % msg
 
     def _ok(self, msg):
-        print '\n\33[32m***OK: %s \33[0m' % msg
+        print '\n\33[32m***[OK]: %s \33[0m' % msg
 
     def _auto_allocate(self, hosts):
         # enable mgmt node if node count is larger than mgmt_th
@@ -90,8 +90,9 @@ class Deploy:
         self.zk_hosts = hosts[-zk_num:]
 
     def _get_host_allocate(self):
+        config_file = 'config.ini'
         conf = ConfigParser()
-        conf.read("config.ini")
+        conf.read(config_file)
         try:
             hosts_data = conf.items('hosts')
         except:
@@ -102,7 +103,10 @@ class Deploy:
         except:
             roles_data = []
 
-        self.host_list = [ i.strip() for i in hosts_data[0][1].split(',') ]
+        try:
+            self.host_list = [ i.strip() for i in hosts_data[0][1].split(',') ]
+        except IndexError:
+            self._err('Failed to parse hosts from %s' % config_file)
 
         cfg_data = [ [i[0],i[1].split(',')] for i in roles_data ]
         # auto set if no role config found
@@ -253,7 +257,8 @@ class Deploy:
                          },
                          { 'sname': 'hive', 'stype': 'HIVE', 
                            'roles': [ {'rname': 'hive-metastore', 'rtype': 'HIVEMETASTORE', 'rhost': self.hms_host}, 
-                                      {'rname': 'hive-server2', 'rtype': 'HIVESERVER2', 'rhost': self.hs2_host}]
+                                      {'rname': 'hive-server2', 'rtype': 'HIVESERVER2', 'rhost': self.hs2_host},
+                                      {'rname': 'hive-gateway', 'rtype': 'GATEWAY', 'rhosts': self.dn_hosts} ]
                          },
                          { 'sname': 'mapreduce', 'stype': 'MAPREDUCE', 
                            'roles': [ {'rname': 'mapreduce-jobtracker', 'rtype': 'JOBTRACKER', 'rhost': self.jt_host},
@@ -309,6 +314,9 @@ class Deploy:
         self._ok('First run successfully executed. Your cluster has been set up!')
 
 if __name__ == "__main__":
+    if len(sys.argv)==1: 
+        print '***ERROR: Please input cloudera master hostname with FQDN'
+        exit(1)
     deploy = Deploy(cm_host=sys.argv[1])
     deploy.setup_cms()
     deploy.setup_parcel()

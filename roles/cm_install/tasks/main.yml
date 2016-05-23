@@ -1,4 +1,24 @@
 ---
+- name: Modify /etc/hosts on all nodes
+  template: src=hosts.j2 dest=/etc/hosts
+  become: yes
+
+- name: Temporary disable selinux
+  shell: "setenforce 0"
+  become: yes
+
+- name: Stop iptables
+  service: name=iptables state=stopped
+  become: yes
+
+- name: Start ntpd
+  service: name=ntpd state=started
+  become: yes
+
+- name: Copy local repo config file to all nodes
+  template: src=local.repo.j2 dest=/etc/yum.repos.d/local.repo
+  become: yes
+
 - name: Install Cloudera Manager on master node
   yum: name=cloudera-manager-server,cloudera-manager-server-db-2,cloudera-manager-daemons,cloudera-manager-agent state=present
   become: yes
@@ -12,8 +32,9 @@
   yum: name=oracle-j2sdk1.7 state=present
   become: yes
 
-- set_fact:
-    parcel_dir: '/opt/home/parcel/5.4.8-rhel/'
+- name: Clean up local repo config file on all nodes
+  file: path=/etc/yum.repos.d/local.repo state=absent
+  become: yes
 
 - name: Copy Parcel files to Cloudera Manager node
   copy: src={{ parcel_dir }}/ dest=/opt/cloudera/parcel-repo/ directory_mode=yes
@@ -32,6 +53,8 @@
 
 - name: Start Cloudera server DB
   service: name=cloudera-scm-server-db state=restarted
+#  shell: " su -s /bin/bash cloudera-scm -c 'touch /var/log/cloudera-scm-server/db.log; /usr/share/cmf/bin/initialize_embedded_db.sh /var/lib/cloudera-scm-server-db/data /var/log/cloudera-scm-server/db.log';
+#   su -s /bin/bash cloudera-scm -c 'pg_ctl start -w -D /var/lib/cloudera-scm-server-db/data -l /var/log/cloudera-scm-server/db.log'"
   become: yes
   when: inventory_hostname in groups['cdhmaster']
 
@@ -49,3 +72,12 @@
 - name: Start Cloudera agent
   service: name=cloudera-scm-agent state=restarted
   become: yes
+
+- name: Wait for Cloudera http port 7180 up
+  shell: 'netstat -nlp|grep 7180'
+  register: res
+  until: res.rc==0
+  retries: 10
+  delay: 10
+  become: yes
+  when: inventory_hostname in groups['cdhmaster']
