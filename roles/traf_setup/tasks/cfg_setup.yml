@@ -80,10 +80,15 @@
   shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
   register: zookeeper_quorum
 
+- name: Get zookeeper port
+  shell: "grep 'hbase.zookeeper.property.clientPort' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
+  register: zookeeper_port
+
 - name: Set variables
   set_fact:
     interface: "{{ net_interface.stdout }}"
     zk_hosts: "{{ zookeeper_quorum.stdout }}"
+    zk_port: "{{ zookeeper_port.stdout }}"
     dcs_srv_file: "{{ sq_root }}/dcs-{{ traf_version }}/conf/servers"
     dcs_master_file: "{{ sq_root }}/dcs-{{ traf_version }}/conf/master"
     dcs_bkmaster_file: "{{ sq_root }}/dcs-{{ traf_version }}/conf/backup-masters"

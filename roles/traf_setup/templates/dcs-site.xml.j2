@@ -26,6 +26,10 @@
 
 <configuration>
   <property>
+    <name>dcs.zookeeper.property.clientPort</name>
+    <value>{{ zk_port }}</value>
+  </property>
+  <property>
     <name>dcs.zookeeper.quorum</name>
     <value>{{ zk_hosts }}</value>
   </property>
