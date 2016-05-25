@@ -26,6 +26,10 @@
 
 <configuration>
   <property>
+    <name>rest.zookeeper.property.clientPort</name>
+    <value>{{ zk_port }}</value>
+  </property>
+  <property>
     <name>rest.zookeeper.quorum</name>
     <value>{{ zk_hosts }}</value>
   </property>
