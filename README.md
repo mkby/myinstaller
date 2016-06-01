@@ -1,10 +1,10 @@
 ## EsgynDB Ansible Installer
 
-### Install esgynDB on top of CDH5.4/HDP2.3(2.4)/Vanilla Hadoop
+### Install esgynDB on top of CDH5.4(5.5)/HDP2.3(2.4)/Vanilla Hadoop
 
 **Prerequisite:**
 
- - Cloudera5.4.x/Hortonworks2.3(2.4)/Vanilla Hadoop is installed on esgynDB nodes
+ - Cloudera5.4.x(5.5.x)/Hortonworks2.3(2.4)/Vanilla Hadoop is installed on esgynDB nodes
   - CM or Ambari web UI is avaiable
  - /etc/hosts is configured correctly on installer's node
   - It contains all hostname info for esgynDB nodes
