@@ -5,7 +5,7 @@ import socket
 import time
 import json
 from ConfigParser import ConfigParser
-from cdh_deploy import Deploy
+from deploy_cdh import Deploy
 
 
 def info(msg):
@@ -17,6 +17,7 @@ def err(msg):
 
 # get configs
 config_file = 'config.ini'
+repo_port = '8900'
 conf = ConfigParser()
 conf.read(config_file)
 try:
@@ -32,7 +33,7 @@ try:
 
     for cfg in cdh_config:
         if cfg[0] == 'repo_dir': repo_dir = cfg[1]
-        if cfg[0] == 'repo_port': repo_port = cfg[1]
+        #if cfg[0] == 'repo_port': repo_port = cfg[1]
         if cfg[0] == 'parcel_dir': parcel_dir = cfg[1]
 except IndexError:
     err('Failed to parse hosts from %s' % config_file)

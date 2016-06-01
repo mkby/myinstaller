@@ -1,0 +1,4 @@
+- hosts:
+  - cdhnodes
+  roles:
+  - cm_install
