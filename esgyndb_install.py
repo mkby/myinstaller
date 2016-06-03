@@ -554,7 +554,7 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
     cfgs['traf_basename'], cfgs['traf_version'] = _check_rpm('traf_rpm', ['trafodion', 'esgynDB'])
 
     if not no_dbmgr:
-        cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', ['esgynDB-manager'])
+        #cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', ['esgynDB-manager'])
         g('db_admin_user')
         g('db_admin_pwd')
 
@@ -733,11 +733,11 @@ def main():
     parser.add_option("--vanilla-hadoop", action="store_true", dest="vanilla", default=False,
                 help="Install esgynDB on top of Vanilla Hadoop.")
     parser.add_option("--no-dbmgr", action="store_true", dest="nodbmgr", default=False,
-                help="Do not install esgynDB manager.")
+                help="Do not enable and configure esgynDB manager.")
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
-                help="Install esgynDB manager only, be sure esgynDB is previously installed.")
-    parser.add_option("--dbmgr-rpm", dest="dbmgrrpm", metavar="RPMFILE",
-                help="Specify esgynDB manager RPM location.")
+                help="Enable esgynDB manager only.")
+#    parser.add_option("--dbmgr-rpm", dest="dbmgrrpm", metavar="RPMFILE",
+#                help="Specify esgynDB manager RPM location.")
 
     (options, args) = parser.parse_args()
 
@@ -748,8 +748,8 @@ def main():
     if options.dbmgr and options.nodbmgr:
         log_err('Wrong parameter, cannot specify both --dbmgr-only and --no-dbmgr')
 
-    if bool(options.dbmgr) != bool(options.dbmgrrpm):
-        log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
+#    if bool(options.dbmgr) != bool(options.dbmgrrpm):
+#        log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
 
     if options.method:
         if options.method not in ['sudo','su','pbrun','pfexec','runas','doas']:
@@ -847,11 +847,11 @@ def main():
         if options.dbmgr: 
             cmd += ' --tags=dbmgr'
  
-            # will overwrite previous dbmgr_rpm value
-            if os.path.exists(options.dbmgrrpm):
-                cmd += ' --extra-vars "dbmgr_rpm=%s"' % options.dbmgrrpm
-            else:
-                log_err('Failed to find esgynDB manager rpm file')
+          #  # will overwrite previous dbmgr_rpm value
+          #  if os.path.exists(options.dbmgrrpm):
+          #      cmd += ' --extra-vars "dbmgr_rpm=%s"' % options.dbmgrrpm
+          #  else:
+          #      log_err('Failed to find esgynDB manager rpm file')
 
             # force set to false
             no_dbmgr = False

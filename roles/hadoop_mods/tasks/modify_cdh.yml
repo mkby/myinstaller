@@ -70,7 +70,7 @@
        password={{ mgrpwd }}
        validate_certs=no
        body="{{ lookup('file', hbase_rs_conf) }}"
-  with_items: rs_grplist
+  with_items: "{{ rs_grplist }}"
   register: hbase_rs_config_result
 
 - name: CDH - Change ZooKeeper config using Cloudera REST api

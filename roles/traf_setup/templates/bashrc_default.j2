@@ -51,7 +51,7 @@ export TOOLSDIR=
 
 export JAVA_HOME="{{ java_home }}"
 
-export CLUSTERNAME="{{ ansible_hostname }}"
+export CLUSTERNAME=`hostname -s`
 export node_count="{{ node_count }}"
 export ENABLE_HA="{{ enable_ha }}"
 export HBASE_DISTRO="{{ hbase_distro }}"

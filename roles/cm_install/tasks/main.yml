@@ -7,13 +7,17 @@
   shell: "setenforce 0"
   become: yes
 
+- name: Disable selinux
+  selinux: state=disabled
+  become: yes
+
 - name: Stop iptables
   service: name=iptables state=stopped
   become: yes
 
-- name: Start ntpd
-  service: name=ntpd state=started
-  become: yes
+#- name: Start ntpd
+#  service: name=ntpd state=started
+#  become: yes
 
 - name: Copy local repo config file to all nodes
   template: src=local.repo.j2 dest=/etc/yum.repos.d/local.repo

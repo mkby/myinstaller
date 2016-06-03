@@ -11,22 +11,12 @@
   when: instance_exist.stdout!='0'
 
 - name: Uninstall trafodion RPM - RedHat/CentOS
-  yum: name=trafodion state=absent
+  yum: name=trafodion,esgynDB_adv,esgynDB-manager state=absent
   become: yes
   when: ansible_os_family == 'RedHat'
 
 - name: Uninstall trafodion RPM - SuSE
-  zypper: name=trafodion state=absent
-  become: yes
-  when: ansible_os_family == 'Suse'
-
-- name: Uninstall esgynDB-manager RPM - RedHat/CentOS
-  yum: name=esgynDB-manager state=absent
-  become: yes
-  when: ansible_os_family == 'RedHat'
-
-- name: Uninstall esgynDB-manager RPM - SuSE
-  zypper: name=esgynDB-manager state=absent
+  zypper: name=trafodion,esgynDB_adv,esgynDB-manager state=absent
   become: yes
   when: ansible_os_family == 'Suse'
 

@@ -1,49 +1,51 @@
 ---
-- name: Make sure Trafodion is installed
-  shell: "rpm -qa|grep -q {{ traf_basename }}"
-  register: traf_installed
-  failed_when: traf_installed.rc==1
-
-- name: Get RPM full name
-  shell: "echo {{ dbmgr_rpm }} | awk -F/ '{print $NF}'"
-  register: fullname
-
-- name: Set esgynDB manager RPM name
-  set_fact:
-    dbmgr_rpmname: "{{ fullname.stdout }}"
-
-- name: Copy esgynDB manager RPM to all nodes
-  copy: src={{ dbmgr_rpm }} dest=/tmp/ force=yes
-
-- name: Install esgynDB manager RPM - CentOS/RedHat
-  yum: name="/tmp/{{ dbmgr_rpmname }}" state=present
-  become: yes
-  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
-
-# use zypper command directly since zypper module has bug
-# which has been fixed only in later version of ansible
-# https://github.com/ansible/ansible-modules-extras/pull/1256
-- name: Install esgynDB manager RPM - SuSE
-  shell: "zypper install -y /tmp/{{ dbmgr_rpmname }}"
-  become: yes
-  when: ansible_os_family == 'Suse'
-
+#- name: Make sure Trafodion is installed
+#  shell: "rpm -qa|grep -q {{ traf_basename }}"
+#  register: traf_installed
+#  failed_when: traf_installed.rc==1
+#
+#- name: Get RPM full name
+#  shell: "echo {{ dbmgr_rpm }} | awk -F/ '{print $NF}'"
+#  register: fullname
+#
+#- name: Set esgynDB manager RPM name
+#  set_fact:
+#    dbmgr_rpmname: "{{ fullname.stdout }}"
+#
+#- name: Copy esgynDB manager RPM to all nodes
+#  copy: src={{ dbmgr_rpm }} dest=/tmp/ force=yes
+#
+#- name: Install esgynDB manager RPM - CentOS/RedHat
+#  yum: name="/tmp/{{ dbmgr_rpmname }}" state=present
+#  become: yes
+#  when: ansible_os_family == 'RedHat' or ansible_os_family == 'CentOS'
+#
+## use zypper command directly since zypper module has bug
+## which has been fixed only in later version of ansible
+## https://github.com/ansible/ansible-modules-extras/pull/1256
 #- name: Install esgynDB manager RPM - SuSE
-#  zypper: name="/tmp/{{ dbmgr_rpmname }}" state=present
+#  shell: "zypper install -y /tmp/{{ dbmgr_rpmname }}"
 #  become: yes
 #  when: ansible_os_family == 'Suse'
+#
+##- name: Install esgynDB manager RPM - SuSE
+##  zypper: name="/tmp/{{ dbmgr_rpmname }}" state=present
+##  become: yes
+##  when: ansible_os_family == 'Suse'
 
-- name: Get esgynDB manager RPM install location
-  shell: "rpm -ql {{ dbmgr_basename }}-{{ dbmgr_version }}|head -1"
-  register: dbmgr_loc
+#- name: Get esgynDB manager RPM install location
+#  shell: "rpm -ql {{ dbmgr_basename }}-{{ dbmgr_version }}|head -1"
+#  register: dbmgr_loc
 
+- name: Set dbmgr location
+  set_fact:
+    mgblty_install_dir: "{{ sq_root }}/mgblty"
+    dbmgr_install_dir: "{{ sq_root }}/dbmgr-{{ traf_version }}"
 
 - name: Set mgblty and dbmgr install directory
   set_fact:
-    mgblty_install_dir: "{{ dbmgr_loc.stdout }}"
-    mgblty_tools_dir: "{{ dbmgr_loc.stdout }}/opentsdb/tools"
-    opentsdb_conf_file: "{{ dbmgr_loc.stdout }}/opentsdb/etc/opentsdb/opentsdb.conf"
-    dbmgr_install_dir: "{{ dbmgr_loc.stdout }}"
+    mgblty_tools_dir: "{{ mgblty_install_dir }}/opentsdb/tools"
+    opentsdb_conf_file: "{{ mgblty_install_dir }}/opentsdb/etc/opentsdb/opentsdb.conf"
     dcs_master_host: "{{ groups['firstnode'][0] }}"
 
 - name: Set dcs master hostname if DCS HA enabled
@@ -135,7 +137,7 @@
   when: "'HDP' in distro or 'BigInsights' in distro"
 
 - name: Registering Metrics
-  shell: "source /home/trafodion/.bashrc; if [[ -f {{ mgblty_tools_dir }}/registerMetrics.py ]]; then python {{ mgblty_tools_dir }}/registerMetrics.py; else {{ mgblty_tools_dir }}/register_metrics.sh; fi"
+  shell: "source /home/trafodion/.bashrc; {{ mgblty_tools_dir }}/register_metrics.sh"
   become_user: trafodion
   become: yes
   when: inventory_hostname in groups['firstnode']
