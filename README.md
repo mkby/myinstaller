@@ -10,8 +10,8 @@
   - It contains all hostname info for esgynDB nodes
  - Ansible is installed on installer's node
   - epel repository is enabled
-  - run command `` sudo yum install ansible1.9 `` to simply install ansbile
- - esgynDB and esgynDB-manager RPM is stored on installer's node
+  - run command `` sudo yum install ansible1.9 `` to simply install ansbile or use [offline ansible1.9.2](https://github.com/mkby/offlineansible1.92) 
+ - esgynDB RPM is stored on installer's node
 
 **Features:**
 
