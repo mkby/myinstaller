@@ -117,6 +117,10 @@
   become_user: trafodion
   become: yes
 
+- name: Get zookeeper quorum
+  shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
+  register: zookeeper_quorum
+
 - name: Get zookeeper hostname
   set_fact:
     zkhosts: "{% for n in zookeeper_quorum.stdout.split(',') %} {{ n + ':2181' }} {% endfor %}"
@@ -169,16 +173,14 @@
   become: yes
   when: "'HDP' in distro or 'BigInsights' in distro"
 
-- name: Get zookeeper quorum
-  shell: "grep 'hbase.zookeeper.quorum' -A1 {{ hbase_xml_file }} |tail -n1|sed s'/.*<value>\\(.*\\)<\\/value>/\\1/g'"
-  register: zookeeper_quorum
-
 - name: Edit openTSDB logback.xml
   replace: dest={{ mgblty_install_dir }}/opentsdb/etc/opentsdb/logback.xml
            regexp='/var/log/opentsdb' replace='../../log'
   become_user: trafodion
   become: yes
 
+- name: Set executable for bosun-linux-amd64
+  file: path={{ mgblty_install_dir }}/bosun/bin/bosun-linux-amd64 mode=0755
 
 - name: Configure esgynDB manager
   shell: "source /home/trafodion/.bashrc; {{ dbmgr_install_dir }}/bin/configure.py --httpport {{ dm_http_port }} --httpsport {{ dm_https_port }} --dcshost {{ ansible_hostname }} --dcsport {{ dcs_port }} --password dbmgr23400 --dcsinfoport {{ dcs_info_port }} --resthost {{ ansible_hostname }} --restport {{ rest_port }} --tsdhost {{ ansible_hostname }} --tsdport {{ tsd_port }} --bosunhost {{ ansible_hostname }} --bosunport {{ http_port }} --timezone {{ tz.stdout_lines[0] }} --adminuser {{ db_admin_user }} --adminpassword {{ db_admin_pwd }}"
