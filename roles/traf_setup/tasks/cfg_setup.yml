@@ -36,6 +36,11 @@
     hbase_trx_jar: "hbase-trx-cdh5_5-*"
   when: "'CDH' in distro and '5.5.' in distro"
 
+- name: Set Hbase trx jar file 
+  set_fact:
+    hbase_trx_jar: "hbase-trx-cdh5_5-*"
+  when: "'CDH' in distro and '5.6.' in distro"
+
 # use the default parcel dir
 - name: Detect Hbase lib path for CDH parcel
   stat: path=/opt/cloudera/parcels/CDH/lib/hbase/lib
@@ -63,9 +68,6 @@
     hbase_lib_path: "{{ hbase_home }}/lib"
     hbase_trx_jar: "hbase-trx-apache*"
   when: "'apache' in distro"
-
-
-- debug: var=hbase_trx_jar
 
 - name: Copy HBase trx jar file to all nodes
   shell: "cp /home/trafodion/{{ traf_basename }}-{{ traf_version }}/export/lib/{{ hbase_trx_jar }} {{ hbase_lib_path }} 2>/dev/null; echo -n"

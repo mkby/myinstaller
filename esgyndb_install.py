@@ -126,8 +126,8 @@ class HadoopDiscover:
 
     def get_rsnodes(self):
         if 'CDH' in self.distro:
-            if not '5.4.' in self.distro and not '5.5.' in self.distro:
-                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4/5.5')
+            if not '5.4.' in self.distro and not '5.5.' in self.distro and not '5.6.' in self.distro:
+                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4/5.5/5.6')
             self._get_rsnodes_cdh()
         elif 'HDP' in self.distro:
             if not '2.3' in self.distro and not '2.4' in self.distro:
