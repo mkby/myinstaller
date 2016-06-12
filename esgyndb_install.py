@@ -810,7 +810,9 @@ def main():
         ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
         hosts_file = installer_loc + '/hosts'
         ts = time.strftime('%y%m%d_%H%M')
-        log_path = '%s/esgyndb_install_%s.log' %(installer_loc, ts)
+        logs_dir = installer_loc + '/logs'
+        if not os.path.exists(logs_dir): os.mkdir(logs_dir)
+        log_path = '%s/esgyndb_install_%s.log' %(logs_dir, ts)
 
         try:
             with open(ansible_cfg, 'w') as f:

@@ -6,6 +6,7 @@
 - name: Temporary disable selinux
   shell: "setenforce 0"
   become: yes
+  ignore_errors: true
 
 - name: Disable selinux
   selinux: state=disabled
