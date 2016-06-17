@@ -170,7 +170,7 @@ class UserInput:
         self.in_data = {
             'traf_start':
             {
-                'prompt':'Start Trafodion instance after installation',
+                'prompt':'Start instance after installation',
                 'default':'Y',
                 'isYN':True
             },
@@ -302,7 +302,7 @@ class UserInput:
             },
             'traf_rpm':
             {
-                'prompt':'Enter full path to Trafodion RPM file',
+                'prompt':'Enter full path to esgynDB RPM file',
                 'isexist': True
             },
             'db_admin_user':
