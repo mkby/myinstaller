@@ -4,39 +4,20 @@ import os, sys
 import socket
 import time
 import json
-from ConfigParser import ConfigParser
 from deploy_cdh import Deploy
+from common import *
 
-
-def info(msg):
-    print '\n\33[33m***[INFO]: %s \33[0m' % msg
-
-def err(msg):
-    print '\n\33[31m***[ERROR]: %s \33[0m' % msg
-    exit(0)
-
-# get configs
-config_file = 'config.ini'
 repo_port = '8900'
-conf = ConfigParser()
-conf.read(config_file)
-try:
-    hosts_data = conf.items('hosts')
-    cdh_config = conf.items('cdh_config')
-except:
-    err('Failed to read config file %s' % config_file)
+# get configs
+cfg = ParseConfig()
+cdhnodes = cfg.get_item('hosts')
+repo_dir = cfg.get_item('repo_dir')
+parcel_dir = cfg.get_item('parcel_dir')
 
+if not repo_dir: err('Failed to get repository dir')
+if not parcel_dir: err('Failed to get parcel dir')
 
-try:
-    cdhnodes = [ i.strip() for i in hosts_data[0][1].split(',') ]
-    cdhmaster = cdhnodes[0]
-
-    for cfg in cdh_config:
-        if cfg[0] == 'repo_dir': repo_dir = cfg[1]
-        #if cfg[0] == 'repo_port': repo_port = cfg[1]
-        if cfg[0] == 'parcel_dir': parcel_dir = cfg[1]
-except IndexError:
-    err('Failed to parse hosts from %s' % config_file)
+cdhmaster = cdhnodes[0]
 
 with open('/etc/hosts', 'r') as f:
     lines = f.readlines()
@@ -51,7 +32,9 @@ installer_loc = sys.path[0]
 ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
 hosts_file = installer_loc + '/hosts'
 ts = time.strftime('%y%m%d_%H%M')
-log_path = '%s/cdh_install_%s.log' %(installer_loc, ts)
+logs_dir = installer_loc + '/logs'
+if not os.path.exists(logs_dir): os.mkdir(logs_dir)
+log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
 
 # set ansible cfg
 try:
@@ -75,17 +58,19 @@ except IOError:
 
 
 # main
-info('Starting temporary python http server')
-os.system("cd %s; python -m SimpleHTTPServer %s > /dev/null 2>&1 &" % (repo_dir, repo_port))
+user = sys.argv[1] if len(sys.argv)>1 else ''
+http_start(repo_dir, repo_port)
 
 cmd = 'ansible-playbook cm_install.yml -k --extra-vars='
 cmd += '"repo_ip=%s repo_port=%s parcel_dir=%s"' % (repo_ip, repo_port, parcel_dir)
 cmd += ' --extra-vars \'%s\'' % hosts_json
+if user:
+    cmd += ' -u %s' % user
 info('Starting ansible playbook to deploy cloudera rpms')
+print cmd
 rc = os.system(cmd)
 
-info('Stopping python http server')
-os.system("ps -ef|grep SimpleHTTPServer |grep -v grep | awk '{print $2}' |xargs kill -9")
+http_stop()
 
 if rc:
     err('Failed to deploy cloudera')

@@ -33,7 +33,7 @@
   yum: name=cloudera-manager-daemons,cloudera-manager-agent state=present
   become: yes
 
-- name: Install JDK1.7 on all nodes
+- name: Install JDK on all nodes
   yum: name=oracle-j2sdk1.7 state=present
   become: yes
 

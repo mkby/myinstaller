@@ -25,6 +25,7 @@ try:
 except ImportError:
     print 'Python module prettytable is not found. Install python-prettytable first.'
     sys.exit(1)
+from common import *
 
 # init global cfgs for user input
 cfgs = defaultdict(str)
@@ -32,30 +33,6 @@ cfgs = defaultdict(str)
 installer_loc = sys.path[0]
 tmp_file = installer_loc + '/.esgyndb_config_temp'
 def_cfgfile = installer_loc + '/esgyndb_config'
-
-class ParseJson:
-    """ 
-    jload: load json file to a dict
-    jsave: save dict to json file with pretty format
-    """
-    def __init__(self, js_file):
-        self.js_file = js_file
-
-    def jload(self):
-        with open(self.js_file, 'r') as f:
-            tmparray = f.readlines()
-        content = ''
-        for t in tmparray:
-            content += t
-
-        try:
-            return defaultdict(str, json.loads(content))
-        except ValueError:
-            log_err('No json format found in config file')
-
-    def jsave(self, dic):
-        with open(self.js_file, 'w') as f:
-            f.write(json.dumps(dic, indent=4))
 
 class HttpGet:
     def __init__(self, user, passwd):
@@ -94,6 +71,21 @@ class HadoopDiscover:
         self.hg = HttpGet(cfgs['mgr_user'], base64.b64decode(cfgs['mgr_pwd']))
         self.cluster_name = cluster_name
         self.cluster_url = '%s/api/v1/clusters/%s' % (cfgs['mgr_url'], cluster_name.replace(' ', '%20'))
+        self._check_version()
+
+    def _check_version(self):
+        cdh_version_list = ['5.4','5.5','5.6']
+        hdp_version_list = ['2.3','2.4']
+        distro_name = ''
+
+        if 'CDH' in self.distro: version_list = cdh_version_list
+        if 'HDP' in self.distro: version_list = hdp_version_list
+
+        has_version = 0
+        for ver in version_list:
+            if ver + '.' in self.distro: has_version = 1
+            if not has_version:
+                log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
 
     def get_hadoop_users(self):
         if 'CDH' in self.distro:
@@ -126,14 +118,8 @@ class HadoopDiscover:
 
     def get_rsnodes(self):
         if 'CDH' in self.distro:
-            if not '5.4.' in self.distro and not '5.5.' in self.distro and not '5.6.' in self.distro:
-                log_err('Incorrect CDH version, currently EsgynDB only supports CDH5.4/5.5/5.6')
             self._get_rsnodes_cdh()
-        elif 'HDP' in self.distro:
-            if not '2.3' in self.distro and not '2.4' in self.distro:
-                log_err('Incorrect HDP version, currently EsgynDB only supports HDP2.3/2.4')
-            self._get_rsnodes_hdp()
-        elif 'BigInsights' in self.distro:
+        elif 'HDP' in self.distro or 'BigInsights' in self.distro:
             self._get_rsnodes_hdp()
 
         self.rsnodes.sort()
@@ -441,47 +427,13 @@ class UserInput:
             log_err('User quit')
 
 
-def expNumRe(text):
-    """
-    expand numeric regular expression to list
-    e.g. 'n[01-03] n1[0-1]': ['n01','n02','n03','n10','n11']
-    e.g. 'n[09-11].com': ['n09.com','n10.com','n11.com']
-    """
-    explist = []
-    for regex in text.split():
-        r = re.match(r'(.*)\[(\d+)-(\d+)\](.*)',regex)
-        if r:
-            h = r.group(1)
-            d1 = r.group(2)
-            d2 = r.group(3)
-            t = r.group(4)
-
-            convert = lambda d: str(('%0' + str(min(len(d1), len(d2))) + 'd') % d)
-            if d1 > d2: d1,d2 = d2,d1
-            explist.extend([h + convert(c) + t for c in range(int(d1), int(d2)+1)])
-
-        else:
-            # keep original value if not matched
-            explist.append(regex)
-
-    return explist
-
-
 def log_err(errtext):
-
-    print '***ERROR: ' + errtext
     global tmp_file
     # save tmp config files
     tp = ParseJson(tmp_file)
     tp.jsave(cfgs)
 
-    sys.exit(1)
-
-def format_output(text):
-    num = len(text) + 4
-    print '*' * num
-    print '  ' + text
-    print '*' * num
+    err(errtext)
 
 def check_node_conn():
     for node in cfgs['node_list'].split():
@@ -682,14 +634,6 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
 
     u.notify_user()
 
-def time_elapse(start, end):
-    """ set time format from seconds to h:m:s """
-    seconds = end - start
-    hours = seconds / 3600
-    seconds = seconds % 3600
-    minutes = seconds / 60
-    seconds = seconds % 60
-    print "Installation time: %d hour(s) %d minute(s) %d second(s)" % (hours, minutes, seconds)
 
 def pre_check():
     """ check required packages should be installed """
@@ -701,6 +645,7 @@ def pre_check():
 
 def main():
     """ esgyndb_installer main loop """
+    global cfgs, installer_loc
 
     pre_check()
 
@@ -736,8 +681,8 @@ def main():
                 help="Do not enable and configure esgynDB manager.")
     parser.add_option("--dbmgr-only", action="store_true", dest="dbmgr", default=False,
                 help="Enable esgynDB manager only.")
-#    parser.add_option("--dbmgr-rpm", dest="dbmgrrpm", metavar="RPMFILE",
-#                help="Specify esgynDB manager RPM location.")
+    parser.add_option("--offline", action="store_true", dest="offline", default=False,
+                help="Enable local repository for installing esgynDB.")
 
     (options, args) = parser.parse_args()
 
@@ -745,15 +690,22 @@ def main():
     if options.dryrun and options.cfgfile:
         log_err('Wrong parameter, cannot specify both --dryrun and --config-file')
 
+    if options.dryrun and options.offline:
+        log_err('Wrong parameter, cannot specify both --dryrun and --offline')
+
     if options.dbmgr and options.nodbmgr:
         log_err('Wrong parameter, cannot specify both --dbmgr-only and --no-dbmgr')
-
-#    if bool(options.dbmgr) != bool(options.dbmgrrpm):
-#        log_err('Wrong parameter, must specify both --dbmgr-only and --dbmgr-rpm')
 
     if options.method:
         if options.method not in ['sudo','su','pbrun','pfexec','runas','doas']:
             log_err('Wrong method, valid methods: [ sudo | su | pbrun | pfexec | runas | doas ].')
+
+    if options.offline:
+        parsecfg = ParseConfig()
+        repo_dir = parsecfg.get_item('repo_dir')
+        if not repo_dir: log_err('local repo directory is not set in config.ini')
+        http_start(repo_dir, '9900')
+        cfgs['offline_mode'] = 'Y' 
         
     no_dbmgr = True if options.nodbmgr else False
     vanilla_hadoop = True if options.vanilla else False
@@ -762,7 +714,6 @@ def main():
     # get user input and gen variable file
     #######################################
     format_output('EsgynDB Installation Start')
-    global cfgs, installer_loc
     if options.cfgfile:
         if not os.path.exists(options.cfgfile): 
             log_err('Cannot find config file \'%s\'' % options.cfgfile)
@@ -774,7 +725,7 @@ def main():
 
     # must install Trafodion first if using dbmgr only mode
     if options.dbmgr and not os.path.exists(config_file):
-        log_err('Must specify the config file, which means you have previously installed Trafodion')
+        log_err('Must specify the config file, which means you have previously installed esgynDB.')
 
     # not specified config file and default config file doesn't exist either
     if options.dryrun or (not os.path.exists(config_file)): 
@@ -848,13 +799,6 @@ def main():
         # only install esgynDB manager
         if options.dbmgr: 
             cmd += ' --tags=dbmgr'
- 
-          #  # will overwrite previous dbmgr_rpm value
-          #  if os.path.exists(options.dbmgrrpm):
-          #      cmd += ' --extra-vars "dbmgr_rpm=%s"' % options.dbmgrrpm
-          #  else:
-          #      log_err('Failed to find esgynDB manager rpm file')
-
             # force set to false
             no_dbmgr = False
 
@@ -879,6 +823,7 @@ def main():
         if options.method: cmd += ' --become-method=%s' % options.method
 
         rc = os.system(cmd)
+        if options.offline: http_stop()
         if rc: log_err('Failed to install EsgynDB by ansible, please check log file %s for details.\n\
     Double check config file \'%s\' to make sure nothing is wrong.' % (log_path, config_file))
 
