@@ -96,7 +96,7 @@ def main():
     else:
         info('Cloudera rpm installed successfully!')
 
-    if options.pkgonly: config_cdh()
+    if not options.pkgonly: config_cdh()
 
 if __name__ == "__main__":
     main()
