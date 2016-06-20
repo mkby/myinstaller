@@ -9,15 +9,18 @@ from random import choice
 from common import *
 
 class Deploy:
-    def __init__(self, cm_host=None, cm_port='7180', cm_user='admin', cm_passwd='admin', cluster_name='cluster1'):
+    def __init__(self, cm_port='7180', cm_user='admin', cm_passwd='admin', cluster_name='cluster1'):
 
         self.cluster_name = cluster_name
         self.cdh_version = "CDH5"
 
-        self._get_host_allocate()
-        self.cm_host = cm_host
+        self.cfg = ParseConfig()
+        self.host_list = self.cfg.get_hosts()
 
-        self.api = ApiResource(cm_host, cm_port, cm_user, cm_passwd, version=7)
+        self._get_host_allocate()
+        self.cm_host = self.host_list[0]
+
+        self.api = ApiResource(self.cm_host, cm_port, cm_user, cm_passwd, version=7)
         self.cm = self.api.get_cloudera_manager()
 
         try:
@@ -26,7 +29,7 @@ class Deploy:
             try:
                 self.cluster = self.api.create_cluster(self.cluster_name, self.cdh_version)
             except:
-                err('Cannot connect to cloudera manager on %s' % cm_host)
+                err('Cannot connect to cloudera manager on %s' % self.cm_host)
 
         # add all our hosts to the cluster
         try:
@@ -81,9 +84,7 @@ class Deploy:
         self.zk_hosts = hosts[-zk_num:]
 
     def _get_host_allocate(self):
-        cfg = ParseConfig()
-        self.host_list = cfg.get_item('hosts')
-        roles = cfg.get_item('roles')
+        roles = self.cfg.get_roles()
         # auto set if no role config found
         if not roles:
             self._auto_allocate(self.host_list)
@@ -289,10 +290,7 @@ class Deploy:
         ok('First run successfully executed. Your cluster has been set up!')
 
 if __name__ == "__main__":
-    if len(sys.argv)==1: 
-        print '***ERROR: Please input cloudera master hostname with FQDN'
-        exit(1)
-    deploy = Deploy(cm_host=sys.argv[1])
+    deploy = Deploy()
     deploy.setup_cms()
     deploy.setup_parcel()
     deploy.start_cms()

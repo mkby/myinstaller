@@ -309,7 +309,7 @@ class UserInput:
             },
             'node_list':
             {
-                'prompt':'Enter list of Nodes separated by space, support simple numeric RE,\n e.g. \'n[01-12] n[21-25]\',\'n0[1-5].com\''
+                'prompt':'Enter list of Nodes separated by comma, support simple numeric RE,\n e.g. \'n[01-12],n[21-25]\',\'n0[1-5].com\''
             },
             'cluster_no':
             {
@@ -702,7 +702,7 @@ def main():
 
     if options.offline:
         parsecfg = ParseConfig()
-        repo_dir = parsecfg.get_item('repo_dir')
+        repo_dir = parsecfg.get_repodir()
         if not repo_dir: log_err('local repo directory is not set in config.ini')
         http_start(repo_dir, '9900')
         cfgs['offline_mode'] = 'Y' 

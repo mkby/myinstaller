@@ -4,7 +4,7 @@
   become: yes
 
 - name: Temporary disable selinux
-  shell: "setenforce 0"
+  shell: "setenforce 0; echo -n"
   become: yes
   ignore_errors: true
 

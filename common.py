@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import json
+import re
 from ConfigParser import ConfigParser
 from collections import defaultdict
 
@@ -45,13 +46,15 @@ class ParseConfig:
         self.conf = ConfigParser()
         self.conf.read(self.cfg_file)
 
-    def _get_hosts(self):
+    def get_hosts(self):
         try:
-            return [ i.strip() for i in self.conf.items('hosts')[0][1].split(',') ]
+            host_content = self.conf.items('hosts')[0][1]
+            return expNumRe(host_content)
+            #return [ i.strip() for i in host_content.split(',') ]
         except IndexError:
             err('Failed to parse hosts from %s' % self.cfg_file)
 
-    def _get_roles(self):
+    def get_roles(self):
         try:
             return [ [i[0],i[1].split(',')] for i in self.conf.items('roles') ]
         except:
@@ -59,22 +62,16 @@ class ParseConfig:
 
     def _get_dir(self, dir_name):
         try:
-            return [c[1] for c in self.conf.items('cdh_config') if c[0] == dir_name][0]
+            return [c[1] for c in self.conf.items('dirs') if c[0] == dir_name][0]
         except:
             return ''
 
-    def _get_repodir(self):
+    def get_repodir(self):
         return self._get_dir('repo_dir')
 
-    def _get_parceldir(self):
+    def get_parceldir(self):
         return self._get_dir('parcel_dir')
 
-    def get_item(self, item):
-        if item == 'hosts': return self._get_hosts()
-        elif item == 'roles': return self._get_roles()
-        elif item == 'repo_dir': return self._get_repodir()
-        elif item == 'parcel_dir': return self._get_parceldir()
-        else: err('Incorrect item')
     
 def http_start(repo_dir, repo_port):
     info('Starting temporary python http server')
@@ -93,11 +90,12 @@ def format_output(text):
 def expNumRe(text):
     """
     expand numeric regular expression to list
-    e.g. 'n[01-03] n1[0-1]': ['n01','n02','n03','n10','n11']
+    e.g. 'n[01-03],n1[0-1]': ['n01','n02','n03','n10','n11']
     e.g. 'n[09-11].com': ['n09.com','n10.com','n11.com']
     """
     explist = []
-    for regex in text.split():
+    for regex in text.split(','):
+        regex = regex.strip()
         r = re.match(r'(.*)\[(\d+)-(\d+)\](.*)',regex)
         if r:
             h = r.group(1)

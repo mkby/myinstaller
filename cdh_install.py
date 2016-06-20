@@ -5,82 +5,98 @@ import socket
 import time
 import json
 from deploy_cdh import Deploy
+from optparse import OptionParser
 from common import *
 
-repo_port = '8900'
-# get configs
-cfg = ParseConfig()
-cdhnodes = cfg.get_item('hosts')
-repo_dir = cfg.get_item('repo_dir')
-parcel_dir = cfg.get_item('parcel_dir')
+def config_cdh():
+    # config cdh
+    deploy = Deploy(cm_host=cdhmaster)
+    deploy.setup_cms()
+    deploy.setup_parcel()
+    deploy.start_cms()
+    deploy.setup_cdh()
+    deploy.start_cdh()
 
-if not repo_dir: err('Failed to get repository dir')
-if not parcel_dir: err('Failed to get parcel dir')
+def main():
+    usage = 'usage: %prog [options]\n'
+    usage += '  Cloudera install script. It will install and configure Cloudera rpms \n\
+  and deploy Hadoop services via cm api.'
+    parser = OptionParser(usage=usage)
+    parser.add_option("-u", "--remote-user", dest="user", metavar="USER",
+                help="Specify ssh login user for remote server, \
+                      if not provided, use current login user as default.")
+    parser.add_option("-p", "--package-only", action="store_true", dest="pkgonly", default=False,
+                help="Install Cloudera package only but not deploy it. Please use CM web page to deploy it manually.")
 
-cdhmaster = cdhnodes[0]
+    (options, args) = parser.parse_args()
 
-with open('/etc/hosts', 'r') as f:
-    lines = f.readlines()
+    repo_port = '8900'
+    # get configs
+    cfg = ParseConfig()
+    cdhnodes = cfg.get_hosts()
+    repo_dir = cfg.get_repodir()
+    parcel_dir = cfg.get_parceldir()
 
-hosts = [ [l for l in lines if h in l][0] for h in cdhnodes ]
-hosts_json = json.dumps({'hosts':hosts})
+    if not repo_dir: err('Failed to get repository dir')
+    if not parcel_dir: err('Failed to get parcel dir')
 
-hostname = socket.gethostname()
-repo_ip = socket.gethostbyname(hostname)
+    cdhmaster = cdhnodes[0]
 
-installer_loc = sys.path[0]
-ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-hosts_file = installer_loc + '/hosts'
-ts = time.strftime('%y%m%d_%H%M')
-logs_dir = installer_loc + '/logs'
-if not os.path.exists(logs_dir): os.mkdir(logs_dir)
-log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
+    with open('/etc/hosts', 'r') as f:
+        lines = f.readlines()
 
-# set ansible cfg
-try:
-    with open(ansible_cfg, 'w') as f:
-        f.write('[defaults]\n')
-        f.write('log_path = %s\n' % log_path)
-        f.write('inventory =' + hosts_file + '\n')
-        f.write('host_key_checking = False\n')
-except IOError:
-    log_err('Failed to open ansible.cfg file')
+    hosts = [ [l for l in lines if h in l][0] for h in cdhnodes ]
+    hosts_json = json.dumps({'hosts':hosts})
 
-cdhnodes = [ i + '\n' for i in cdhnodes ]
-try:
-    with open(hosts_file, 'w') as f:
-        f.write('\n[cdhmaster]\n')
-        f.write(cdhmaster)
-        f.write('\n[cdhnodes]\n')
-        f.writelines(cdhnodes)
-except IOError:
-    log_err('Failed to open hosts file')
+    hostname = socket.gethostname()
+    repo_ip = socket.gethostbyname(hostname)
 
+    installer_loc = sys.path[0]
+    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
+    hosts_file = installer_loc + '/hosts'
+    ts = time.strftime('%y%m%d_%H%M')
+    logs_dir = installer_loc + '/logs'
+    if not os.path.exists(logs_dir): os.mkdir(logs_dir)
+    log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
 
-# main
-user = sys.argv[1] if len(sys.argv)>1 else ''
-http_start(repo_dir, repo_port)
+    # set ansible cfg
+    try:
+        with open(ansible_cfg, 'w') as f:
+            f.write('[defaults]\n')
+            f.write('log_path = %s\n' % log_path)
+            f.write('inventory =' + hosts_file + '\n')
+            f.write('host_key_checking = False\n')
+    except IOError:
+        log_err('Failed to open ansible.cfg file')
 
-cmd = 'ansible-playbook cm_install.yml -k --extra-vars='
-cmd += '"repo_ip=%s repo_port=%s parcel_dir=%s"' % (repo_ip, repo_port, parcel_dir)
-cmd += ' --extra-vars \'%s\'' % hosts_json
-if user:
-    cmd += ' -u %s' % user
-info('Starting ansible playbook to deploy cloudera rpms')
-print cmd
-rc = os.system(cmd)
+    cdhnodes = [ i + '\n' for i in cdhnodes ]
+    try:
+        with open(hosts_file, 'w') as f:
+            f.write('\n[cdhmaster]\n')
+            f.write(cdhmaster)
+            f.write('\n[cdhnodes]\n')
+            f.writelines(cdhnodes)
+    except IOError:
+        log_err('Failed to open hosts file')
 
-http_stop()
+    http_start(repo_dir, repo_port)
 
-if rc:
-    err('Failed to deploy cloudera')
-else:
-    info('Cloudera rpm deployed successfully!')
+    cmd = 'ansible-playbook cm_install.yml -k --extra-vars='
+    cmd += '"repo_ip=%s repo_port=%s parcel_dir=%s"' % (repo_ip, repo_port, parcel_dir)
+    cmd += ' --extra-vars \'%s\'' % hosts_json
+    if options.user: cmd += ' -u %s' % options.user
 
-# config cdh
-deploy = Deploy(cm_host=cdhmaster)
-deploy.setup_cms()
-deploy.setup_parcel()
-deploy.start_cms()
-deploy.setup_cdh()
-deploy.start_cdh()
+    info('Starting ansible playbook to deploy cloudera rpms')
+    rc = os.system(cmd)
+
+    http_stop()
+
+    if rc:
+        err('Failed to deploy cloudera')
+    else:
+        info('Cloudera rpm installed successfully!')
+
+    if options.pkgonly: config_cdh()
+
+if __name__ == "__main__":
+    main()
