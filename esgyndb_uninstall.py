@@ -2,7 +2,7 @@
 
 import sys
 import os
-from esgyndb_install import ParseJson, expNumRe, format_output, log_err
+from common import *
 from optparse import OptionParser
 
 installer_loc = sys.path[0]
@@ -36,6 +36,13 @@ def main():
     notify = lambda n: raw_input('Uninstall trafodion on [%s], press [y] to continue: ' % n)
 
     node_list = '' 
+    def manual_input():
+        node_lists = raw_input('Please manually input trafodion node list to uninstall: ')
+        if not node_lists: err('Empty value')
+        node_list = ' '.join(expNumRe(node_lists))
+        rc = notify(node_list)
+        if rc.lower() != 'y': sys.exit(1)
+
     if options.cfgfile:
         p = ParseJson(options.cfgfile)
         cfgs = p.jload()
@@ -49,18 +56,14 @@ def main():
                 try:
                     index = lines.index('[firstnode]\n')
                 except ValueError:
-                    log_err('Incorrect hosts file')
+                    err('Incorrect hosts file')
             for i in range(1, index-1): 
                 node_list = node_list + ' ' + lines[i].strip()
         except IOError:
-            log_err('Failed to open hosts file')
-
+            err('no hosts')
         rc = notify(node_list)
         if rc.lower() != 'y':
-            node_lists = raw_input('Please manually input trafodion node list to uninstall: ')
-            node_list = ' '.join(expNumRe(node_lists))
-            rc = notify(node_list)
-            if rc.lower() != 'y': sys.exit(1)
+            manual_input()
     
     node_array = node_list.split()
     node_array = [ node + '\n' for node in node_array ]
@@ -72,7 +75,7 @@ def main():
             f.write('\n[firstnode]\n')
             f.writelines(node_array[0])
     except IOError:
-        log_err('Failed to open hosts file')
+        err('Failed to open hosts file')
 
     format_output('Uninstall Start')
 
@@ -86,7 +89,7 @@ def main():
     if options.method: cmd += ' --become-method=%s' % options.method
 
     rc = os.system(cmd)
-    if rc: log_err('Failed to uninstall Trafodion by ansible')
+    if rc: err('Failed to uninstall Trafodion by ansible')
 
     format_output('Uninstall Complete')
 

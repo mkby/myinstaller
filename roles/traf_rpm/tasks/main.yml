@@ -14,6 +14,11 @@
   set_fact:
     rpm_name: "{{ fullname.stdout }}"
     
+- name: Copy local repo config file to all nodes
+  template: src=local_traf.repo.j2 dest=/etc/yum.repos.d/local_traf.repo
+  become: yes
+  when: offline_mode is defined
+
 - name: Install trafodion RPM - CentOS
   yum: name="/tmp/{{ rpm_name }}" state=present
   become: yes
@@ -44,6 +49,11 @@
   shell: "rpm -i /tmp/{{ rpm_name }} --force"
   when: ansible_os_family == 'SuSE' and rpm_installed_suse.changed==False
   become: yes
+
+- name: Clean up local repo config file on all nodes
+  file: path=/etc/yum.repos.d/local_traf.repo state=absent
+  become: yes
+  when: offline_mode is defined
 
 - name: Create trafodion user if not exists
   user: name=trafodion shell=/bin/bash groups=trafodion

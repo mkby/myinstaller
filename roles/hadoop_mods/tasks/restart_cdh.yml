@@ -3,8 +3,8 @@
   uri: url={{ mgr_url }}/api/v1/clusters/{{ cluster_name }}/commands/restart
        method=POST
        user={{ mgr_user }}
-       validate_certs=no
        password={{ mgrpwd }}
+       validate_certs=no
   register: restart_cmd
   tags: restart_hadoop
 
@@ -19,3 +19,21 @@
   retries: 40
   delay: 15
 
+- name: "Deploy Client Config"
+  uri: url={{ mgr_url }}/api/v6/clusters/{{ cluster_name }}/commands/deployClientConfig
+       method=POST
+       user={{ mgr_user }}
+       password={{ mgrpwd }}
+       validate_certs=no
+  register: deploy_cmd
+
+- name: "CDH - Check deploy config status until successful (timeout: 5mins)"
+  uri: url={{ mgr_url }}/api/v1/commands/{{ deploy_cmd.json.id }}
+       method=GET
+       user={{ mgr_user }}
+       password={{ mgrpwd }}
+       validate_certs=no
+  register: deploy_status
+  until: deploy_status.json.active==False and deploy_status.json.success==True
+  retries: 30
+  delay: 10

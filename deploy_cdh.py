@@ -4,20 +4,23 @@ import sys
 from cm_api.api_client import ApiResource, ApiException
 from cm_api.endpoints.services import ApiServiceSetupInfo
 from time import sleep
-from ConfigParser import ConfigParser
 from collections import defaultdict
 from random import choice
+from common import *
 
 class Deploy:
-    def __init__(self, cm_host=None, cm_port='7180', cm_user='admin', cm_passwd='admin', cluster_name='cluster1'):
+    def __init__(self, cm_port='7180', cm_user='admin', cm_passwd='admin', cluster_name='cluster1'):
 
         self.cluster_name = cluster_name
         self.cdh_version = "CDH5"
 
-        self._get_host_allocate()
-        self.cm_host = cm_host
+        self.cfg = ParseConfig()
+        self.host_list = self.cfg.get_hosts()
 
-        self.api = ApiResource(cm_host, cm_port, cm_user, cm_passwd, version=7)
+        self._get_host_allocate()
+        self.cm_host = self.host_list[0]
+
+        self.api = ApiResource(self.cm_host, cm_port, cm_user, cm_passwd, version=7)
         self.cm = self.api.get_cloudera_manager()
 
         try:
@@ -26,33 +29,24 @@ class Deploy:
             try:
                 self.cluster = self.api.create_cluster(self.cluster_name, self.cdh_version)
             except:
-                self._err('Cannot connect to cloudera manager on %s' % cm_host)
+                err('Cannot connect to cloudera manager on %s' % self.cm_host)
 
         # add all our hosts to the cluster
         try:
             self.cluster.add_hosts(self.host_list)
-            self._info('Add hosts successfully')
+            info('Add hosts successfully')
         except Exception as e:
             if e.code == 400:
-                self._info('Already Added hosts')
+                info('Already Added hosts')
             elif e.code == 404:
-                self._err(e.message)
+                err(e.message)
 
-    def _err(self, msg):
-        print '\n\33[31m***[ERROR]: %s \33[0m' % msg
-        exit(0)
-
-    def _info(self, msg):
-        print '\n\33[33m***[INFO]: %s \33[0m' % msg
-
-    def _ok(self, msg):
-        print '\n\33[32m***[OK]: %s \33[0m' % msg
 
     def _auto_allocate(self, hosts):
         # enable mgmt node if node count is larger than mgmt_th
         mgmt_th = 6
 
-        if type(hosts) != list: self._err('hosts parameter should be a list')
+        if type(hosts) != list: err('hosts parameter should be a list')
         host_num = len(hosts)
         # node<=3, ZK=1 ,node>3, ZK=3
         zk_num = 1 if host_num <= 3 else 3
@@ -90,37 +84,19 @@ class Deploy:
         self.zk_hosts = hosts[-zk_num:]
 
     def _get_host_allocate(self):
-        config_file = 'config.ini'
-        conf = ConfigParser()
-        conf.read(config_file)
-        try:
-            hosts_data = conf.items('hosts')
-        except:
-            self._err('Incorrect config format')
-
-        try:
-            roles_data = conf.items('roles')
-        except:
-            roles_data = []
-
-        try:
-            self.host_list = [ i.strip() for i in hosts_data[0][1].split(',') ]
-        except IndexError:
-            self._err('Failed to parse hosts from %s' % config_file)
-
-        cfg_data = [ [i[0],i[1].split(',')] for i in roles_data ]
+        roles = self.cfg.get_roles()
         # auto set if no role config found
-        if not cfg_data:
+        if not roles:
             self._auto_allocate(self.host_list)
             return
 
         valid_roles = ['DN', 'RS', 'ZK', 'HM', 'NN', 'SNN', 'AP', 'ES', 'SM', 'HO', 'TT', 'JT', 'HMS', 'HS2']
         role_host = defaultdict(list)
 
-        for item in cfg_data:      
+        for item in roles:      
             for role in item[1]:
                 role = role.strip()
-                if role not in valid_roles: self._err('Incorrect role config')
+                if role not in valid_roles: err('Incorrect role config')
                 role_host[role].append(item[0])
 
         # cdh
@@ -153,16 +129,16 @@ class Deploy:
             mgmt.create_role('EventServer', "EVENTSERVER", self.es_host)
             mgmt.create_role('HostMonitor', "HOSTMONITOR", self.hm_host)
             mgmt.create_role('ServiceMonitor', "SERVICEMONITOR", self.sm_host)
-            self._ok('Cloudera management service created successfully.')
+            ok('Cloudera management service created successfully.')
         except ApiException:
-            self._info('Cloudera management service had already been created.')
+            info('Cloudera management service had already been created.')
 
     def setup_parcel(self):
         parcels_list = []
         for i,p in enumerate(self.cluster.get_all_parcels()):
             if p.stage == 'AVAILABLE_REMOTELY': continue
             elif p.stage == 'ACTIVATED':
-                self._info('Parcel [%s] has already been activated' % p.version)
+                info('Parcel [%s] has already been activated' % p.version)
                 return
             else:
                 print "Available parcels:"
@@ -170,11 +146,11 @@ class Deploy:
                 parcels_list.append(p)
 
         if len(parcels_list) == 0:
-            self._err('No downloaded ' + self.cdh_version + ' parcel found!')
+            err('No downloaded ' + self.cdh_version + ' parcel found!')
         elif len(parcels_list) > 1:
             index = raw_input('input parcel number:')
             if not index.isdigit:
-                self._err('Error index, must be a number')
+                err('Error index, must be a number')
             cdh_parcel = parcels_list[int(index)-1]
         else:
             cdh_parcel = parcels_list[0]
@@ -194,7 +170,7 @@ class Deploy:
       #  print cdh_parcel.product + ' ' + cdh_parcel.version + " downloaded"
 
         # distribute the parcel
-        self._info('Starting parcel distribution. This might take a while.')
+        info('Starting parcel distribution. This might take a while.')
         cmd = cdh_parcel.start_distribution()
         i = 0
         while cmd.success == None:
@@ -205,34 +181,34 @@ class Deploy:
             print '\r%s' % s,
             sys.stdout.flush()
         if cmd.success != True:
-            self._err('Parcel distribution failed!')
+            err('Parcel distribution failed!')
 
         # make sure the distribution finishes
         while cdh_parcel.stage != "DISTRIBUTED":
             sleep(5)
             cdh_parcel = self.cluster.get_parcel(cdh_parcel.product, cdh_parcel.version)
 
-        self._ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' distributed')
+        ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' distributed')
 
         # activate the parcel
         cmd = cdh_parcel.activate()
         if cmd.success != True:
-            self._err('Parcel activation failed!')
+            err('Parcel activation failed!')
 
         # make sure the activation finishes
         while cdh_parcel.stage != "ACTIVATED":
             sleep(5)
             cdh_parcel = self.cluster.get_parcel(cdh_parcel.product, cdh_parcel.version)
 
-        self._ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' activated')
+        ok(cdh_parcel.product + ' ' + cdh_parcel.version + ' activated')
 
     def _create_service(self, sdata):
         try:
             self.cluster.get_service(sdata['sname'])
-            self._info('Service %s had already been configured' % sdata['sname'])
+            info('Service %s had already been configured' % sdata['sname'])
         except ApiException:
             service = self.cluster.create_service(sdata['sname'], sdata['stype'])
-            self._ok('Service %s had been created successfully' % sdata['sname'])
+            ok('Service %s had been created successfully' % sdata['sname'])
             for role in sdata['roles']:
                 if role.has_key('rhost'):
                     service.create_role(role['rname'], role['rtype'], role['rhost'])
@@ -283,25 +259,25 @@ class Deploy:
                             'hive_metastore_database_port' : hive_metastore_database_port, \
                             'hive_metastore_database_type' : hive_metastore_database_type }
             hive_service.update_config(hive_config)
-            self._ok('Additional hive configs had been updated')
+            ok('Additional hive configs had been updated')
         except ApiException as e:
-            self._err(e.message)
+            err(e.message)
 
         # use auto configure for *-site.xml configs
         try:
             self.cluster.auto_configure()
         except ApiException as e:
-            self._err(e.message)
+            err(e.message)
 
     def start_cms(self):
         # start the management service
-        self._info('Starting cloudera management service...')
+        info('Starting cloudera management service...')
         cms = self.cm.get_service()
         cms.start().wait()
-        self._ok('Cloudera management service started successfully')
+        ok('Cloudera management service started successfully')
 
     def start_cdh(self):
-        self._info('Excuting first run command. This might take a while.')
+        info('Excuting first run command. This might take a while.')
         cmd = self.cluster.first_run()
 
         while cmd.success == None:
@@ -309,15 +285,12 @@ class Deploy:
             sleep(1)
 
         if cmd.success != True:
-            self._err('The first run command failed: ' + cmd.resultMessage)
+            err('The first run command failed: ' + cmd.resultMessage)
 
-        self._ok('First run successfully executed. Your cluster has been set up!')
+        ok('First run successfully executed. Your cluster has been set up!')
 
 if __name__ == "__main__":
-    if len(sys.argv)==1: 
-        print '***ERROR: Please input cloudera master hostname with FQDN'
-        exit(1)
-    deploy = Deploy(cm_host=sys.argv[1])
+    deploy = Deploy()
     deploy.setup_cms()
     deploy.setup_parcel()
     deploy.start_cms()
