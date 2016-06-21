@@ -45,7 +45,10 @@ def main():
     with open('/etc/hosts', 'r') as f:
         lines = f.readlines()
 
-    hosts = [ [l for l in lines if h in l][0] for h in cdhnodes ]
+    try:
+        hosts =[ [l for l in lines if h in l][0] for h in cdhnodes ] 
+    except IndexError:
+        err('hosts mismatch, please check the hosts in config.ini are set in /etc/hosts.')
     hosts_json = json.dumps({'hosts':hosts})
 
     hostname = socket.gethostname()
