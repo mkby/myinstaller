@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 import os
+import sys
 import json
 import re
 from ConfigParser import ConfigParser
 from collections import defaultdict
 
+installer_loc = sys.path[0]
+ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
+hosts_file = installer_loc + '/hosts'
+logs_dir = installer_loc + '/logs'
 
 def ok(msg):
     print '\n\33[32m***[OK]: %s \33[0m' % msg
