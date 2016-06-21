@@ -10,7 +10,7 @@ from common import *
 
 def config_cdh():
     # config cdh
-    deploy = Deploy(cm_host=cdhmaster)
+    deploy = Deploy()
     deploy.setup_cms()
     deploy.setup_parcel()
     deploy.start_cms()
@@ -51,11 +51,7 @@ def main():
     hostname = socket.gethostname()
     repo_ip = socket.gethostbyname(hostname)
 
-    installer_loc = sys.path[0]
-    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-    hosts_file = installer_loc + '/hosts'
     ts = time.strftime('%y%m%d_%H%M')
-    logs_dir = installer_loc + '/logs'
     if not os.path.exists(logs_dir): os.mkdir(logs_dir)
     log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
 
