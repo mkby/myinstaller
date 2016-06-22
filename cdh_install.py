@@ -10,7 +10,7 @@ from common import *
 
 def config_cdh():
     # config cdh
-    deploy = Deploy(cm_host=cdhmaster)
+    deploy = Deploy()
     deploy.setup_cms()
     deploy.setup_parcel()
     deploy.start_cms()
@@ -27,8 +27,14 @@ def main():
                       if not provided, use current login user as default.")
     parser.add_option("-p", "--package-only", action="store_true", dest="pkgonly", default=False,
                 help="Install Cloudera package only but not deploy it. Please use CM web page to deploy it manually.")
+    parser.add_option("--version", action="store_true", dest="version", default=False,
+                help="Show installer version.")
 
     (options, args) = parser.parse_args()
+
+    if options.version: 
+        print 'Installer version: %s' % version
+        exit(0)
 
     repo_port = '8900'
     # get configs
@@ -45,17 +51,16 @@ def main():
     with open('/etc/hosts', 'r') as f:
         lines = f.readlines()
 
-    hosts = [ [l for l in lines if h in l][0] for h in cdhnodes ]
+    try:
+        hosts =[ [l for l in lines if h in l][0] for h in cdhnodes ] 
+    except IndexError:
+        err('hosts mismatch, please check the hosts in config.ini are set in /etc/hosts.')
     hosts_json = json.dumps({'hosts':hosts})
 
     hostname = socket.gethostname()
     repo_ip = socket.gethostbyname(hostname)
 
-    installer_loc = sys.path[0]
-    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-    hosts_file = installer_loc + '/hosts'
     ts = time.strftime('%y%m%d_%H%M')
-    logs_dir = installer_loc + '/logs'
     if not os.path.exists(logs_dir): os.mkdir(logs_dir)
     log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
 

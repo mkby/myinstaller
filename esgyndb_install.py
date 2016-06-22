@@ -30,7 +30,6 @@ from common import *
 # init global cfgs for user input
 cfgs = defaultdict(str)
 
-installer_loc = sys.path[0]
 tmp_file = installer_loc + '/.esgyndb_config_temp'
 def_cfgfile = installer_loc + '/esgyndb_config'
 
@@ -473,7 +472,7 @@ def check_mgr_url():
     
 def user_input(no_dbmgr=False, vanilla_hadoop=False):
     """ get user's input and check input value """
-    global cfgs, tmp_file, installer_loc
+    global cfgs, tmp_file
     # load from temp storaged config file
     if os.path.exists(tmp_file):
         tp = ParseJson(tmp_file)
@@ -506,7 +505,6 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
     cfgs['traf_basename'], cfgs['traf_version'] = _check_rpm('traf_rpm', ['trafodion', 'esgynDB'])
 
     if not no_dbmgr:
-        #cfgs['dbmgr_basename'], cfgs['dbmgr_version'] = _check_rpm('dbmgr_rpm', ['esgynDB-manager'])
         g('db_admin_user')
         g('db_admin_pwd')
 
@@ -642,16 +640,7 @@ def pre_check():
     rc = os.system('which ansible-playbook >/dev/null 2>&1')
     if rc: log_err('\'ansible\' is not found, please install it first')
 
-
-def main():
-    """ esgyndb_installer main loop """
-    global cfgs, installer_loc
-
-    pre_check()
-
-    ################################
-    # script options and usage info
-    ################################
+def get_options():
     usage = 'usage: %prog [options]\n'
     usage += '  EsgynDB install wrapper script. It will create ansible\n\
   config, variables, hosts file and call ansible to install EsgynDB.'
@@ -683,10 +672,25 @@ def main():
                 help="Enable esgynDB manager only.")
     parser.add_option("--offline", action="store_true", dest="offline", default=False,
                 help="Enable local repository for installing esgynDB.")
+    parser.add_option("--version", action="store_true", dest="version", default=False,
+                help="Show the installer version.")
 
     (options, args) = parser.parse_args()
+    return options
 
+def main():
+    """ esgyndb_installer main loop """
+    global cfgs
+
+    pre_check()
+
+    #########################
     # handle parser option
+    #########################
+    options = get_options()
+    if options.version:
+        print 'Installer version: %s' % version
+        exit(0)
     if options.dryrun and options.cfgfile:
         log_err('Wrong parameter, cannot specify both --dryrun and --config-file')
 
@@ -758,10 +762,7 @@ def main():
         first_rsnode = cfgs['first_rsnode']
         node_array = [ node + '\n' for node in node_array ]
 
-        ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-        hosts_file = installer_loc + '/hosts'
         ts = time.strftime('%y%m%d_%H%M')
-        logs_dir = installer_loc + '/logs'
         if not os.path.exists(logs_dir): os.mkdir(logs_dir)
         log_path = '%s/esgyndb_install_%s.log' %(logs_dir, ts)
 

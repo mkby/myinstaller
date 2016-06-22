@@ -5,9 +5,6 @@ import os
 from common import *
 from optparse import OptionParser
 
-installer_loc = sys.path[0]
-hosts_file = installer_loc + '/hosts'
-
 def main():
     """ uninstaller main loop """
 
