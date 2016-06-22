@@ -6,6 +6,7 @@ import re
 from ConfigParser import ConfigParser
 from collections import defaultdict
 
+version = 'v2.0.1'
 installer_loc = sys.path[0]
 ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
 hosts_file = installer_loc + '/hosts'

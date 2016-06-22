@@ -27,8 +27,14 @@ def main():
                       if not provided, use current login user as default.")
     parser.add_option("-p", "--package-only", action="store_true", dest="pkgonly", default=False,
                 help="Install Cloudera package only but not deploy it. Please use CM web page to deploy it manually.")
+    parser.add_option("--version", action="store_true", dest="version", default=False,
+                help="Show installer version.")
 
     (options, args) = parser.parse_args()
+
+    if options.version: 
+        print 'Installer version: %s' % version
+        exit(0)
 
     repo_port = '8900'
     # get configs

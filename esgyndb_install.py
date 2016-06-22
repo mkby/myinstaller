@@ -672,6 +672,8 @@ def get_options():
                 help="Enable esgynDB manager only.")
     parser.add_option("--offline", action="store_true", dest="offline", default=False,
                 help="Enable local repository for installing esgynDB.")
+    parser.add_option("--version", action="store_true", dest="version", default=False,
+                help="Show the installer version.")
 
     (options, args) = parser.parse_args()
     return options
@@ -686,6 +688,9 @@ def main():
     # handle parser option
     #########################
     options = get_options()
+    if options.version:
+        print 'Installer version: %s' % version
+        exit(0)
     if options.dryrun and options.cfgfile:
         log_err('Wrong parameter, cannot specify both --dryrun and --config-file')
 
