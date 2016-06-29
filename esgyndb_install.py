@@ -83,8 +83,9 @@ class HadoopDiscover:
         has_version = 0
         for ver in version_list:
             if ver + '.' in self.distro: has_version = 1
-            if not has_version:
-                log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
+
+        if not has_version:
+            log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
 
     def get_hadoop_users(self):
         if 'CDH' in self.distro:
