@@ -36,5 +36,3 @@
 - name: Delete trafodion user
   user: name=trafodion state=absent remove=yes
   become: yes
-  ignore_errors: true
-
