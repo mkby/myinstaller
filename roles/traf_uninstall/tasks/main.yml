@@ -30,7 +30,8 @@
   ignore_errors: true
 
 - name: Remove unused files and settings
-  shell: "rm /etc/security/limits.d/trafodion.conf /usr/lib/hbase/lib/hbase-trx-* /opt/cloudera/parcels/CDH/lib/hbase/lib/hbase-trx-* /usr/hdp/current/hbase-regionserver/lib/hbase-trx-* -rf 2>/dev/null"
+  #shell: "rm /etc/security/limits.d/trafodion.conf /usr/lib/hbase/lib/hbase-trx-* /opt/cloudera/parcels/CDH/lib/hbase/lib/hbase-trx-* /usr/hdp/current/hbase-regionserver/lib/hbase-trx-* -rf 2>/dev/null"
+  shell: "rm /etc/security/limits.d/trafodion.conf -rf 2>/dev/null"
   become: yes
 
 - name: Delete trafodion user

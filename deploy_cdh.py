@@ -135,20 +135,21 @@ class Deploy:
 
     def setup_parcel(self):
         parcels_list = []
-        for i,p in enumerate(self.cluster.get_all_parcels()):
+        i = 1
+        for p in self.cluster.get_all_parcels():
             if p.stage == 'AVAILABLE_REMOTELY': continue
             elif p.stage == 'ACTIVATED':
                 info('Parcel [%s] has already been activated' % p.version)
                 return
             else:
-                print "Available parcels:"
                 print '\t' + str(i) + ': ' + p.product + ' ' + p.version
+                i += 1
                 parcels_list.append(p)
 
         if len(parcels_list) == 0:
             err('No downloaded ' + self.cdh_version + ' parcel found!')
         elif len(parcels_list) > 1:
-            index = raw_input('input parcel number:')
+            index = raw_input('Input parcel number:')
             if not index.isdigit:
                 err('Error index, must be a number')
             cdh_parcel = parcels_list[int(index)-1]
