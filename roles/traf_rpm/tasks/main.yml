@@ -1,7 +1,7 @@
 - name: Install epel repo if not exists
   copy: src=epel.repo dest=/etc/yum.repos.d/ force=no
   become: yes
-  when: ansible_os_family == 'RedHat'
+  when: ansible_os_family == 'RedHat' and offline_mode is not defined
 
 - name: Copy trafodion RPM to all nodes
   copy: src={{ traf_rpm }} dest=/tmp/ force=yes
@@ -58,6 +58,9 @@
 - name: Create trafodion user if not exists
   user: name=trafodion shell=/bin/bash groups=trafodion
   become: yes
+
+- name: Force set trafodion home folder owner to trafodion
+  file: path=/home/trafodion owner=trafodion group=trafodion
 
 - name: Get RPM location
   shell: "rpm -ql {{ traf_basename }}-{{ traf_version }} |head -1"
