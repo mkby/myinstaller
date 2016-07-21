@@ -3,14 +3,16 @@ import os
 import sys
 import json
 import re
+import time
 from ConfigParser import ConfigParser
 from collections import defaultdict
 
-version = 'v2.0.1'
+__version__ = 'v2.0.2'
 installer_loc = sys.path[0]
-ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
-hosts_file = installer_loc + '/hosts'
-logs_dir = installer_loc + '/logs'
+
+def version():
+    print 'Installer version: %s' % __version__
+    exit(0)
 
 def ok(msg):
     print '\n\33[32m***[OK]: %s \33[0m' % msg
@@ -86,6 +88,31 @@ def http_start(repo_dir, repo_port):
 def http_stop():
     info('Stopping python http server')
     os.system("ps -ef|grep SimpleHTTPServer |grep -v grep | awk '{print $2}' |xargs kill -9")
+
+
+def set_ansible_cfgs(host_content):
+    ts = time.strftime('%y%m%d_%H%M')
+    logs_dir = installer_loc + '/logs'
+    hosts_file = installer_loc + '/hosts'
+    if not os.path.exists(logs_dir): os.mkdir(logs_dir)
+    log_path = '%s/%s_%s.log' %(logs_dir, sys.argv[0].split('/')[-1].split('.')[0], ts)
+
+    ansible_cfg = os.getenv('HOME') + '/.ansible.cfg'
+    content = '[defaults]\n'
+    content += 'log_path = %s\n' % log_path
+    content += 'inventory =' + hosts_file + '\n'
+    content += 'host_key_checking = False\n'
+#    content += 'display_skipped_hosts = False\n'
+    def write_file(filename, content):
+        try:
+            with open(filename, 'w') as f:
+                f.write(content)
+        except IOError:
+            log_err('Failed to open %s file' % filename)
+    write_file(ansible_cfg, content)
+    write_file(hosts_file, host_content)
+    
+    return log_path
 
 def format_output(text):
     num = len(text) + 4

@@ -16,9 +16,10 @@
     hadoop_base_path: "{{ hadoop_home }}"
   when: "'apache' in distro"
 
-- name: Set hdfs binary path
+- name: Set hdfs related variables
   set_fact:
     hdfs_cmd: "{{ hadoop_base_path }}/bin/hdfs"
+    traf_hdfsloc: "/user/trafodion"
 
 - name: Wait to make sure HDFS is fully restarted and out of safemode
   shell: "{{ hdfs_cmd }} dfsadmin -safemode wait"
@@ -26,13 +27,13 @@
   become: yes
 
 - name: Create Trafodion needed folders in HDFS
-  shell: "{{ hdfs_cmd }} dfs -mkdir -p /hbase-staging /bulkload /lobs /hbase/archive 2>/dev/null"
+  shell: "{{ hdfs_cmd }} dfs -mkdir -p {{ traf_hdfsloc }}/trafodion_backups {{ traf_hdfsloc }}/bulkload {{ traf_hdfsloc }}/lobs /hbase/archive /hbase-staging 2>/dev/null"
   ignore_errors: true
   become_user: "{{ hdfs_user }}"
   become: yes
 
 - name: Change ownership in HDFS
-  shell: "{{ hdfs_cmd }} dfs -chown -R {{ hbase_user }}:{{ hbase_user }} /hbase-staging /hbase/archive; {{ hdfs_cmd }} dfs -chown -R trafodion:trafodion /bulkload /lobs"
+  shell: "{{ hdfs_cmd }} dfs -chown -R {{ hbase_user }}:{{ hbase_user }} /hbase/archive /hbase-staging; {{ hdfs_cmd }} dfs -chown -R trafodion:trafodion {{ traf_hdfsloc }}/bulkload {{ traf_hdfsloc }}/lobs {{ traf_hdfsloc }}/trafodion_backups"
   ignore_errors: true
   become_user: "{{ hdfs_user }}"
   become: yes
@@ -42,5 +43,3 @@
   ignore_errors: true
   become_user: "{{ hdfs_user }}"
   become: yes
-
-

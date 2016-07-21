@@ -63,16 +63,13 @@ def main():
             manual_input()
     
     node_array = node_list.split()
-    node_array = [ node + '\n' for node in node_array ]
 
-    try:
-        with open(hosts_file, 'w') as f:
-            f.write('[trafnodes]\n')
-            f.writelines(node_array)
-            f.write('\n[firstnode]\n')
-            f.writelines(node_array[0])
-    except IOError:
-        err('Failed to open hosts file')
+    content = '[trafnodes]\n'
+    for n in node_array: content += n + '\n'
+    content += '\n[firstnode]\n' + node_array[0] + '\n'
+
+    write_file(hosts_file, content)
+
 
     format_output('Uninstall Start')
 

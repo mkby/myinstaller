@@ -32,9 +32,7 @@ def main():
 
     (options, args) = parser.parse_args()
 
-    if options.version: 
-        print 'Installer version: %s' % version
-        exit(0)
+    if options.version: version()
 
     repo_port = '8900'
     # get configs
@@ -60,29 +58,10 @@ def main():
     hostname = socket.gethostname()
     repo_ip = socket.gethostbyname(hostname)
 
-    ts = time.strftime('%y%m%d_%H%M')
-    if not os.path.exists(logs_dir): os.mkdir(logs_dir)
-    log_path = '%s/cdh_install_%s.log' %(logs_dir, ts)
-
-    # set ansible cfg
-    try:
-        with open(ansible_cfg, 'w') as f:
-            f.write('[defaults]\n')
-            f.write('log_path = %s\n' % log_path)
-            f.write('inventory =' + hosts_file + '\n')
-            f.write('host_key_checking = False\n')
-    except IOError:
-        log_err('Failed to open ansible.cfg file')
-
-    cdhnodes = [ i + '\n' for i in cdhnodes ]
-    try:
-        with open(hosts_file, 'w') as f:
-            f.write('\n[cdhmaster]\n')
-            f.write(cdhmaster)
-            f.write('\n[cdhnodes]\n')
-            f.writelines(cdhnodes)
-    except IOError:
-        log_err('Failed to open hosts file')
+    # set ansible configs
+    content = '\n[cdhmaster]\n' + cdhmaster + '\n[cdhnodes]\n'
+    for n in cdhnodes: content += n + '\n'
+    log_path = set_ansible_cfgs(content)
 
     http_start(repo_dir, repo_port)
 
@@ -97,9 +76,9 @@ def main():
     http_stop()
 
     if rc:
-        err('Failed to deploy cloudera')
+        err('Failed to deploy cloudera, please check log file %s for details' % log_path)
     else:
-        info('Cloudera rpm installed successfully!')
+        info('Cloudera RPMs installed successfully!')
 
     if not options.pkgonly: config_cdh()
 

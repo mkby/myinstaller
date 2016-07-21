@@ -1,6 +1,6 @@
 
 - name: Create sqconfig for trafodion instance
-  script:  traf_sqconfig 15 1 {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
+  script:  traf_sqconfig 15 1 {{ sq_root + '/sql/scripts/sqconfig' }} {{ scratch_locs }} {{ node_list }}
   become: yes
   become_user: trafodion
   when: "'BigInsights' in distro"
@@ -8,7 +8,7 @@
 # force set to 15
 - name: Create sqconfig for trafodion instance
   #script:  traf_sqconfig {{ ansible_processor_vcpus - 1 }} {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
-  script:  traf_sqconfig 15 {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} {{ node_list }}
+  script:  traf_sqconfig 15 {{ansible_processor_count}} {{ sq_root + '/sql/scripts/sqconfig' }} "{{ scratch_locs }}" "{{ node_list }}"
   become: yes
   become_user: trafodion
   when: "'BigInsights' not in distro"

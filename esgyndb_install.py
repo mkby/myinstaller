@@ -73,7 +73,7 @@ class HadoopDiscover:
         self._check_version()
 
     def _check_version(self):
-        cdh_version_list = ['5.4','5.5','5.6']
+        cdh_version_list = ['5.4','5.5','5.6', '5.7']
         hdp_version_list = ['2.3','2.4']
         distro_name = ''
 
@@ -83,9 +83,8 @@ class HadoopDiscover:
         has_version = 0
         for ver in version_list:
             if ver + '.' in self.distro: has_version = 1
-
-        if not has_version:
-            log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
+            if not has_version:
+                log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
 
     def get_hadoop_users(self):
         if 'CDH' in self.distro:
@@ -238,9 +237,14 @@ class UserInput:
                 'prompt':'Enter Search password (if required)',
                 'default':' ',
             },
+            'scratch_locs':
+            {
+                'prompt':'Enter scratch file location, if more than one folder, use blank seperated',
+                'default':'$MY_SQROOT/tmp',
+            },
             'java_home':
             {
-                'prompt':'Specify location of Java 1.7.0_65 or higher (JDK) on trafodion nodes',
+                'prompt':'Specify location of Java 1.7 or 1.8 (JDK) on trafodion nodes',
                 'default':'/usr/java/jdk1.7.0_67-cloudera'
             },
             'dcs_cnt_per_node':
@@ -601,6 +605,7 @@ def user_input(no_dbmgr=False, vanilla_hadoop=False):
     g('traf_pwd')
     g('traf_start')
     g('dcs_cnt_per_node')
+    g('scratch_locs')
 
     # ldap security
     if g('ldap_security') == 'Y':
@@ -689,9 +694,7 @@ def main():
     # handle parser option
     #########################
     options = get_options()
-    if options.version:
-        print 'Installer version: %s' % version
-        exit(0)
+    if options.version: version()
     if options.dryrun and options.cfgfile:
         log_err('Wrong parameter, cannot specify both --dryrun and --config-file')
 
@@ -759,34 +762,14 @@ def main():
         #####################################
         print '\n** Generating ansible config and hosts file ... \n'
         node_array = cfgs['node_list'].split()
-        first_node = node_array[0]
         first_rsnode = cfgs['first_rsnode']
-        node_array = [ node + '\n' for node in node_array ]
 
-        ts = time.strftime('%y%m%d_%H%M')
-        if not os.path.exists(logs_dir): os.mkdir(logs_dir)
-        log_path = '%s/esgyndb_install_%s.log' %(logs_dir, ts)
+        content = '[trafnodes]\n'
+        for n in node_array: content += n + '\n'
+        content += '\n[firstnode]\n' + node_array[0] + '\n'
+        content += '\n[firstrsnode]\n' + first_rsnode
 
-        try:
-            with open(ansible_cfg, 'w') as f:
-                f.write('[defaults]\n')
-                f.write('log_path = %s\n' % log_path)
-                f.write('inventory =' + hosts_file + '\n')
-                f.write('host_key_checking = False\n')
-                #f.write('display_skipped_hosts = False\n')
-        except IOError:
-            log_err('Failed to open ansible.cfg file')
-
-        try:
-            with open(hosts_file, 'w') as f:
-                f.write('[trafnodes]\n')
-                f.writelines(node_array)
-                f.write('\n[firstnode]\n')
-                f.write(first_node)
-                f.write('\n\n[firstrsnode]\n')
-                f.write(first_rsnode)
-        except IOError:
-            log_err('Failed to open hosts file')
+        log_path = set_ansible_cfgs(content)
 
         #############################
         # calling ansible to install
@@ -842,6 +825,7 @@ def main():
         # or specify the backup config file to install again
         try:
             # only rename default config file
+            ts = time.strftime('%y%m%d_%H%M')
             if config_file == def_cfgfile and os.path.exists(config_file):
                 os.rename(config_file, config_file + '.bak' + ts)
         except OSError:
