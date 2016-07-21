@@ -1,6 +1,6 @@
 
 - name: Create sqconfig for trafodion instance
-  script:  traf_sqconfig 15 1 {{ sq_root + '/sql/scripts/sqconfig' }} {{ scratch_locs }} {{ node_list }}
+  script:  traf_sqconfig 15 1 {{ sq_root + '/sql/scripts/sqconfig' }} "{{ scratch_locs }}" "{{ node_list }}"
   become: yes
   become_user: trafodion
   when: "'BigInsights' in distro"
