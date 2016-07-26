@@ -73,7 +73,7 @@ class HadoopDiscover:
         self._check_version()
 
     def _check_version(self):
-        cdh_version_list = ['5.4','5.5','5.6', '5.7']
+        cdh_version_list = ['5.4.','5.5.','5.6.','5.7.']
         hdp_version_list = ['2.3','2.4']
         distro_name = ''
 
@@ -82,7 +82,7 @@ class HadoopDiscover:
 
         has_version = 0
         for ver in version_list:
-            if ver + '.' in self.distro: has_version = 1
+            if ver in self.distro: has_version = 1
 
         if not has_version:
             log_err('Sorry, currently EsgynDB doesn\'t support %s version' % self.distro)
