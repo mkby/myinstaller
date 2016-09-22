@@ -72,7 +72,7 @@ def main():
             f.write('inventory =' + hosts_file + '\n')
             f.write('host_key_checking = False\n')
     except IOError:
-        log_err('Failed to open ansible.cfg file')
+        err('Failed to open ansible.cfg file')
 
     cdhnodes = [ i + '\n' for i in cdhnodes ]
     try:
@@ -82,7 +82,7 @@ def main():
             f.write('\n[cdhnodes]\n')
             f.writelines(cdhnodes)
     except IOError:
-        log_err('Failed to open hosts file')
+        err('Failed to open hosts file')
 
     http_start(repo_dir, repo_port)
 
